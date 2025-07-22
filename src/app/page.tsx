@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useMemo } from 'react';
+import { useEffect } from 'react';
 import Compass from '@/components/compass';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -36,19 +36,20 @@ export default function Home() {
     permissionState
   } = useGameState(user);
 
+  useEffect(() => {
+    if (!authLoading && !user) {
+      router.push('/login');
+    }
+  }, [authLoading, user, router]);
+
   const renderContent = () => {
-    if (authLoading) {
+    if (authLoading || !user) {
       return (
         <div className="flex flex-col items-center gap-4 text-center">
             <Loader2 className="h-12 w-12 animate-spin text-primary" />
             <p className="text-lg text-muted-foreground">Authenticating...</p>
         </div>
       );
-    }
-    
-    if (!user) {
-       router.push('/login');
-       return null;
     }
 
 
