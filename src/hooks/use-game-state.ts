@@ -103,24 +103,24 @@ export function useGameState(user: User | null) {
     return () => clearInterval(timer);
   }, [gameState, timeLeft, heading, handleGuess]);
 
-  const startNewRound = useCallback(() => {
-    if(currentLocationSet.length === 0) {
+  const startNewRound = useCallback((locations?: Location[]) => {
+    const locationSet = locations || currentLocationSet;
+    if(locationSet.length === 0) {
         toast({ title: "No Locations", description: "Could not find any locations for the selected game mode.", variant: "destructive"});
         resetGame();
         return;
     }
     setUserGuess(null);
     
-    const randomLocation = currentLocationSet[Math.floor(Math.random() * currentLocationSet.length)];
-    // Prevent using the same location twice in a row
-    if (randomLocation.name === target?.name) {
-        startNewRound();
-        return;
-    }
+    // Filter out previous target to avoid repetition
+    const availableLocations = locationSet.filter(l => l.name !== target?.name);
+    const randomLocation = availableLocations[Math.floor(Math.random() * availableLocations.length)];
+    
     setTarget(randomLocation);
-    setGameState('playing');
-    setTimeLeft(ROUND_TIMER);
     setCurrentRound(round => round + 1);
+    setTimeLeft(ROUND_TIMER);
+    setGameState('playing');
+    setGameLoading(false);
     
   }, [currentLocationSet, resetGame, toast, target?.name]);
 
@@ -132,17 +132,25 @@ export function useGameState(user: User | null) {
     setGameState('loading_location');
     setGameLoading(true);
 
-    // Get user location first for any mode
-    getLocation();
+    getLocation(); // This is async, we'll react to its completion in the effect below
 
   }, [getLocation]);
 
+   // This effect chain handles the entire game setup process once a mode is selected.
   useEffect(() => {
-    const setupLocations = async () => {
-        if (!gameMode || !userLocation) return;
+    const setupGame = async () => {
+        if (gameState !== 'loading_location' || locationLoading || !gameMode) return;
+
+        if (!userLocation) {
+            if(locationError) {
+                toast({ title: "Location Error", description: `Could not get your location: ${locationError.message}`, variant: "destructive"});
+                resetGame();
+            }
+            return; // Wait for location data or handle error
+        }
         
-        let locations: Location[] = [];
         try {
+            let locations: Location[] = [];
             if (gameMode === 'NEAR_ME') {
                 locations = await getNearbyLocations({ latitude: userLocation.latitude, longitude: userLocation.longitude });
                 if (locations.length < TOTAL_ROUNDS) {
@@ -154,23 +162,17 @@ export function useGameState(user: User | null) {
                 locations = locationPacks[gameMode];
             }
             setCurrentLocationSet(locations);
+            startNewRound(locations); // Directly start the first round with the new locations
 
         } catch (e: any) {
             toast({ title: "Error", description: `Failed to get locations: ${e.message}`, variant: "destructive"});
             resetGame();
         }
     }
-    if (gameState === 'loading_location' && !locationLoading && userLocation) {
-        setupLocations();
-    }
-  }, [gameState, locationLoading, userLocation, gameMode, resetGame, toast]);
-
-  useEffect(() => {
-    if(currentLocationSet.length > 0) {
-        setGameLoading(false);
-        startNewRound();
-    }
-  }, [currentLocationSet, startNewRound])
+    
+    setupGame();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gameState, gameMode, locationLoading, userLocation, locationError]);
 
 
   const handleSetGameMode = useCallback((mode: GameMode) => {
@@ -192,7 +194,6 @@ export function useGameState(user: User | null) {
        if (currentRound >= TOTAL_ROUNDS) {
             resetGame();
        } else {
-            setGameState('playing');
             startNewRound();
        }
     }
@@ -209,16 +210,6 @@ export function useGameState(user: User | null) {
     }
   }
 
-  // Effect to handle location error
-  useEffect(() => {
-    if (gameState === 'loading_location' && !locationLoading) {
-      if (locationError) {
-        setGameState('idle');
-        setGameLoading(false);
-        toast({ title: "Location Error", description: `Could not get your location: ${locationError.message}`, variant: "destructive"});
-      }
-    }
-  }, [gameState, locationLoading, locationError, toast]);
 
   // Reset to idle if user logs out
   useEffect(() => {
