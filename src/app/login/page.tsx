@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, type FormEvent } from 'react';
+import { useState, type FormEvent, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -21,6 +21,12 @@ export default function LoginPage() {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const { signInWithGoogle, signInWithEmail, signUpWithEmail, user, loading } = useAuth();
     const router = useRouter();
+
+    useEffect(() => {
+        if (user) {
+            router.push('/');
+        }
+    }, [user, router]);
 
     const handleEmailSubmit = async (e: FormEvent, type: 'signin' | 'signup') => {
         e.preventDefault();
@@ -42,7 +48,6 @@ export default function LoginPage() {
     }
 
     if(user) {
-        router.push('/');
         return null;
     }
 
