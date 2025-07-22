@@ -1,6 +1,6 @@
 "use client";
 
-import { type FC } from 'react';
+import { type FC, useRef, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 import { Navigation } from 'lucide-react';
 
@@ -35,6 +35,40 @@ const Compass: FC<CompassProps> = ({
 }) => {
   const compassSize = 320;
   const center = compassSize / 2;
+  const roseRef = useRef<HTMLDivElement>(null);
+  const prevHeadingRef = useRef<number>(heading);
+
+  useEffect(() => {
+    if (roseRef.current) {
+      const prevHeading = prevHeadingRef.current;
+      let newHeading = heading;
+      
+      const diff = newHeading - prevHeading;
+
+      // If we've jumped more than 180 degrees, it's shorter to go the other way
+      if (Math.abs(diff) > 180) {
+        if (diff > 0) {
+          newHeading -= 360;
+        } else {
+          newHeading += 360;
+        }
+      }
+
+      // We apply the rotation and then quickly snap it back to the 0-360 range
+      // so the next rotation is calculated correctly.
+      roseRef.current.style.transition = 'transform 0.5s ease-out';
+      roseRef.current.style.transform = `rotate(${-newHeading}deg)`;
+      
+      setTimeout(() => {
+          if (roseRef.current) {
+            roseRef.current.style.transition = 'none';
+            roseRef.current.style.transform = `rotate(${-heading}deg)`;
+          }
+      }, 500);
+
+      prevHeadingRef.current = heading;
+    }
+  }, [heading]);
 
   const handleCompassClick = (e: React.MouseEvent<HTMLDivElement>) => {
     if (!onGuess || gameState !== 'playing') return;
@@ -61,20 +95,31 @@ const Compass: FC<CompassProps> = ({
         onClick={handleCompassClick}
         style={{ cursor: gameState === 'playing' ? 'pointer' : 'default' }}
       >
-        {/* Compass direction markers */}
-        {['N', 'E', 'S', 'W'].map((dir, i) => (
-            <div
-            key={dir}
-            className="absolute text-xl font-semibold text-muted-foreground transition-transform duration-500 ease-out"
-            style={{
-                transform: `rotate(${i * 90 - heading}deg) translateY(-${center * 0.85}px)`
-            }}
-            >
-                <span style={{transform: `rotate(${-(i * 90 - heading)}deg)`, display: 'inline-block'}}>
-                    {dir}
-                </span>
-            </div>
-        ))}
+        <div 
+          ref={roseRef}
+          className="w-full h-full"
+          style={{ transform: `rotate(${-heading}deg)`}}
+        >
+            {/* Compass direction markers */}
+            {['N', 'E', 'S', 'W'].map((dir, i) => (
+                <div
+                key={dir}
+                className="absolute w-full h-full text-xl font-semibold text-muted-foreground"
+                style={{
+                    transform: `rotate(${i * 90}deg)`
+                }}
+                >
+                    <span style={{
+                        position: 'absolute',
+                        top: `${center * 0.15}px`,
+                        left: '50%',
+                        transform: 'translateX(-50%)'
+                    }}>
+                        {dir}
+                    </span>
+                </div>
+            ))}
+        </div>
       </div>
 
       <div className="absolute w-full h-full pointer-events-none">
