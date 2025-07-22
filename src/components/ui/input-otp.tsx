@@ -1,3 +1,4 @@
+
 "use client"
 
 import * as React from "react"
@@ -63,7 +64,7 @@ const InputOTPSeparator = React.forwardRef<
   React.ComponentPropsWithoutRef<"div">
 >(({ ...props }, ref) => (
   <div ref={ref} role="separator" {...props}>
-    <Dot />
+    <div className="h-px w-4 bg-border" />
   </div>
 ))
 InputOTPSeparator.displayName = "InputOTPSeparator"
