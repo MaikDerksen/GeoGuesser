@@ -12,28 +12,30 @@ interface CompassProps {
   className?: string;
 }
 
-const Needle: FC<{ color: string; }> = ({ color }) => (
-    <svg width="12" height="140" viewBox="0 0 12 140" fill="none" xmlns="http://www.w3.org/2000/svg" className="drop-shadow-md">
-        <path d="M6 0L11.7735 15H0.226497L6 0Z" className={cn("fill-current", color)} />
-        <path d="M5 14L5 139" className={cn("stroke-current", color)} strokeWidth="2"/>
-        <path d="M7 14L7 139" className={cn("stroke-current", color)} strokeWidth="2"/>
-    </svg>
+const Needle: FC<{ color: string; length: number, label: string }> = ({ color, length, label }) => (
+  <div className="relative w-2 h-full">
+    <div
+      className="absolute bottom-1/2 left-0 w-full"
+      style={{ height: length }}
+    >
+      <div className={cn("absolute bottom-0 left-0 w-full h-full bg-current", color)} />
+      <div
+        className={cn("absolute -top-3 left-1/2 -translate-x-1/2 w-0 h-0 border-x-8 border-x-transparent border-b-[16px]", color, 'border-b-current')}
+      />
+    </div>
+     <div className="absolute top-1/2 -mt-20 left-1/2 -translate-x-1/2 text-xs font-bold" style={{ transform: 'rotate(-90deg) translateX(15px)' }}>
+      {label}
+    </div>
+  </div>
 );
 
-
-const Arrow: FC<{ angle: number; color: string; label: string; length: number }> = ({ angle, color, label, length }) => (
+const Arrow: FC<{ angle: number; color: string; label: string; length: number; }> = ({ angle, color, label, length }) => (
   <div
-    className="absolute w-full h-full transition-transform duration-500 ease-out origin-center pointer-events-none"
+    className="absolute w-full h-full transition-transform duration-500 ease-out pointer-events-none"
     style={{ transform: `rotate(${angle}deg)` }}
   >
-    <div
-      className={cn("absolute left-1/2 -translate-x-1/2 bottom-1/2 origin-bottom flex flex-col items-center", color)}
-      style={{ height: `${length}px` }}
-    >
-      <span className={cn("text-xs font-bold bg-background/50 backdrop-blur-sm rounded-sm px-1 mb-1", color)}>{label}</span>
-      <div className="w-12 h-full flex justify-center items-end">
-          <Needle color={color} />
-      </div>
+    <div className={cn("absolute w-full h-full flex justify-center items-start", color)}>
+       <Needle color={color} length={length} label={label}/>
     </div>
   </div>
 );
@@ -148,6 +150,8 @@ const Compass: FC<CompassProps> = ({
           </>
         )}
       </div>
+      
+       <div className="absolute w-4 h-4 bg-foreground rounded-full" />
 
        {/* Fixed pointer at top */}
        <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-3 pointer-events-none">
