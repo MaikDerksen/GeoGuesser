@@ -1,11 +1,11 @@
 
 "use client";
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import Compass from '@/components/compass';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Loader2, Compass as CompassIcon, QrCode, LogOut } from 'lucide-react';
+import { Loader2, Compass as CompassIcon, QrCode, LogOut, Users, Play } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import QRCode from "qrcode.react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
@@ -17,6 +17,7 @@ import { useRouter } from 'next/navigation';
 export default function Home() {
   const { user, loading: authLoading, signOut } = useAuth();
   const router = useRouter();
+  const [isMultiplayer, setIsMultiplayer] = useState(false);
   
   const {
     gameState,
@@ -33,7 +34,8 @@ export default function Home() {
     handleStart,
     handleGuess,
     handleGrantPermission,
-    permissionState
+    permissionState,
+    resetGame,
   } = useGameState(user);
 
   useEffect(() => {
@@ -41,6 +43,15 @@ export default function Home() {
       router.push('/login');
     }
   }, [authLoading, user, router]);
+
+  const handleModeSelection = (multiplayer: boolean) => {
+    setIsMultiplayer(multiplayer);
+    if(multiplayer) {
+      router.push('/lobby');
+    } else {
+      setGameState('mode_selection');
+    }
+  }
 
   const renderContent = () => {
     if (authLoading || !user) {
@@ -80,6 +91,9 @@ export default function Home() {
                     <Button onClick={() => {
                         // Near me is not implemented yet
                     }} size="lg" disabled>Near Me</Button>
+                </CardContent>
+                 <CardContent>
+                    <Button variant="link" onClick={() => resetGame()}>Back to main menu</Button>
                 </CardContent>
             </Card>
         );
@@ -143,7 +157,8 @@ export default function Home() {
             </CardHeader>
             <CardContent className="flex flex-col gap-4">
               <p className="text-muted-foreground">Welcome, {user.displayName || user.email}!</p>
-              <Button onClick={handleStart} size="lg">Start Game</Button>
+               <Button onClick={() => handleModeSelection(false)} size="lg"><Play /> Single Player</Button>
+               <Button onClick={() => handleModeSelection(true)} size="lg"><Users /> Multiplayer</Button>
             </CardContent>
           </Card>
         );

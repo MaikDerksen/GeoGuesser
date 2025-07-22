@@ -40,6 +40,15 @@ export function useGameState(user: User | null) {
     }
   }, []);
 
+  const resetGame = useCallback(() => {
+    setGameState('idle');
+    setGameMode(null);
+    setCurrentRound(0);
+    setScore(0);
+    setUserGuess(null);
+    setTarget(null);
+  }, []);
+
   // Memoize heading calculation
   const heading = useMemo(() => {
     if (!orientation) return 0;
@@ -119,17 +128,16 @@ export function useGameState(user: User | null) {
 
   // Handle starting the game or next round
   const handleStart = useCallback(() => {
-    if (gameState === 'idle') {
-      setGameState('mode_selection');
-    } else if (gameState === 'results') {
+    // This now only handles single player logic continuation.
+    // Multiplayer start is handled in useLobby
+    if (gameState === 'results') {
        if (currentRound >= TOTAL_ROUNDS) {
-            setGameState('idle');
-            setGameMode(null);
+            resetGame();
        } else {
             startNewRound();
        }
     }
-  }, [gameState, currentRound, startNewRound]);
+  }, [gameState, currentRound, startNewRound, resetGame]);
 
   const handleGrantPermission = async () => {
     const status = await requestPermission();
@@ -160,15 +168,13 @@ export function useGameState(user: User | null) {
   // Reset to idle if user logs out
   useEffect(() => {
     if (!user) {
-      setGameState('idle');
-      setGameMode(null);
-      setCurrentRound(0);
-      setScore(0);
+      resetGame();
     }
-  }, [user]);
+  }, [user, resetGame]);
 
   return {
     gameState,
+    setGameState,
     score,
     currentRound,
     totalRounds: TOTAL_ROUNDS,
@@ -182,6 +188,7 @@ export function useGameState(user: User | null) {
     handleStart,
     handleGuess,
     handleGrantPermission,
-    permissionState
+    permissionState,
+    resetGame,
   };
 }
