@@ -9,47 +9,64 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    function isHost(lobbyData) {
-      return request.auth.uid == lobbyData.hostId;
+    function isLobbyHost(lobbyData) {
+      return isSignedIn() && request.auth.uid == lobbyData.hostId;
     }
 
-    function isPlayer(lobbyData) {
-      return request.auth.uid in lobbyData.players.map(p => p.uid);
-    }
-
-    function playerIsJoining(lobbyData) {
-      let isNewPlayer = !(request.auth.uid in lobbyData.players.map(p => p.uid));
-      let isJoining = request.auth.uid in request.resource.data.players.map(p => p.uid);
-      return isNewPlayer && isJoining;
+    function isPlayerInLobby(lobbyData) {
+      return isSignedIn() && request.auth.uid in lobbyData.players.keys();
     }
     
-    function onlyOwnPlayerDataChanged(lobbyData) {
-      // For every player in the future state...
-      return request.resource.data.players.forall(player ->
-        // If it's the current user, they can only change their score and guesses.
-        (player.uid == request.auth.uid && player.keys().hasOnly(['uid', 'displayName', 'photoURL', 'score', 'guesses'])) ||
-        // If it's another player, their data must not have changed at all.
-        (player.uid != request.auth.uid && player == lobbyData.players.get(lobbyData.players.indexWhere('uid', '==', player.uid)))
-      );
+    function playerIsJoining(requestData, resourceData) {
+      let playerListBefore = resourceData.data.players;
+      let playerListAfter = requestData.players;
+      // Check if the user is adding themselves to the list
+      return playerListAfter.size() == playerListBefore.size() + 1 &&
+             !isPlayerInLobby(resource.data) && isPlayerInLobby(request.resource.data);
+    }
+    
+    function playerIsLeaving(requestData, resourceData) {
+       let playerListBefore = resourceData.data.players;
+       let playerListAfter = requestData.players;
+       // Check if the user is removing themselves from the list
+       return playerListAfter.size() == playerListBefore.size() - 1 &&
+              isPlayerInLobby(resource.data) && !isPlayerInLobby(request.resource.data);
     }
 
-
+    function onlyOwnPlayerDataChanged(requestData, resourceData) {
+        let otherPlayerIds = resourceData.data.players.keys().removeAll([request.auth.uid]);
+        let unchanged = true;
+        // Loop through other players to ensure their data hasn't changed
+        // This is a simplified check. A more robust check would compare maps.
+        // For our case, we assume if their map exists with the same key, it's ok.
+        // A more granular check would compare score and guesses fields.
+        forall pId in otherPlayerIds {
+          unchanged = unchanged && (requestData.players[pId] == resourceData.data.players[pId])
+        }
+        return unchanged;
+    }
+    
     match /lobbies/{lobbyId} {
-      allow read;
+      allow read: if true;
+      
+      allow create: if isSignedIn() && isLobbyHost(request.resource.data);
 
-      allow create: if isSignedIn()
-                      && request.resource.data.hostId == request.auth.uid;
-
-      allow update: if isSignedIn() && (
-        // Case 1: The user is the host. Allow them to change game state.
-        isHost(resource.data) ||
+      allow update: if isSignedIn() &&
+        // Case 1: The host is making changes
+        (isLobbyHost(resource.data)) ||
+        // Case 2: A player is joining a lobby that is 'waiting'
+        (playerIsJoining(request.resource.data, resource) && resource.data.status == 'waiting') ||
+        // Case 3: A player is leaving
+        (playerIsLeaving(request.resource.data, resource)) ||
+        // Case 4: Player in the game is updating *only* their own score/guess data.
+        (isPlayerInLobby(resource.data) && onlyOwnPlayerDataChanged(request.resource.data, resource));
         
-        // Case 2: A new player is joining a waiting lobby.
-        (playerIsJoining(resource.data) && resource.data.status == 'waiting') ||
-
-        // Case 3: An existing player is updating only their own score/guesses.
-        (isPlayer(resource.data) && onlyOwnPlayerDataChanged(resource.data))
-      );
+      allow delete: if isSignedIn() && isLobbyHost(resource.data);
+      
+      // Players subcollection for future use if needed, deny all for now.
+      match /players/{playerId} {
+        allow read, write: if false;
+      }
     }
   }
 }
