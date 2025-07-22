@@ -59,6 +59,18 @@ export default function LobbyPage() {
         }
     }
 
+    const handleJoinCodeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const value = e.target.value.toUpperCase();
+        if (value.length > 7) return;
+
+        if (value.length === 3 && joinCode.length < 3) {
+            setJoinCode(value + '-');
+        } else {
+            setJoinCode(value);
+        }
+    };
+
+
     if (lobbyId && lobby) {
         const isHost = lobby.hostId === user.uid;
         return (
@@ -70,7 +82,7 @@ export default function LobbyPage() {
                     </CardHeader>
                     <CardContent className="space-y-6">
                         <div className="flex items-center justify-center space-x-2">
-                           <Input type="text" readOnly value={lobbyId} className="text-center font-mono tracking-widest" />
+                           <Input type="text" readOnly value={lobbyId} className="text-center font-mono tracking-widest text-lg" />
                            <Button onClick={copyLobbyId} size="icon" variant="outline"><Copy/></Button>
                         </div>
                         
@@ -128,12 +140,13 @@ export default function LobbyPage() {
                     </div>
                     <div className="grid gap-2">
                         <Input 
-                            placeholder="Enter 5-digit code" 
+                            placeholder="Enter code (e.g. ABC-XYZ)" 
                             value={joinCode} 
-                            onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
-                            maxLength={5}
+                            onChange={handleJoinCodeChange}
+                            maxLength={7}
+                            className="text-center tracking-widest"
                         />
-                        <Button onClick={() => joinLobby(joinCode)} disabled={lobbyLoading || joinCode.length !== 5}>
+                        <Button onClick={() => joinLobby(joinCode)} disabled={lobbyLoading || joinCode.length !== 7}>
                              {lobbyLoading ? <Loader2 className="animate-spin"/> : 'Join Lobby'}
                         </Button>
                     </div>
