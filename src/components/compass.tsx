@@ -21,16 +21,19 @@ const Needle: FC<{ color: string; }> = ({ color }) => (
 );
 
 
-const Arrow: FC<{ angle: number; color: string; label: string; offset: number }> = ({ angle, color, label, offset }) => (
+const Arrow: FC<{ angle: number; color: string; label: string; length: number }> = ({ angle, color, label, length }) => (
   <div
-    className="absolute w-full h-full transition-transform duration-500 ease-out origin-center"
+    className="absolute w-full h-full transition-transform duration-500 ease-out origin-center pointer-events-none"
     style={{ transform: `rotate(${angle}deg)` }}
   >
-    <div className={cn(`absolute left-1/2 -translate-x-1/2 flex flex-col items-center`, color)} style={{ top: `${offset}px` }}>
-        <div className="w-12 h-[140px] flex justify-center items-start">
-             <Needle color={color} />
-        </div>
-      <span className={cn("text-xs font-bold bg-background/50 backdrop-blur-sm rounded-sm px-1", color)}>{label}</span>
+    <div
+      className={cn("absolute left-1/2 -translate-x-1/2 bottom-1/2 origin-bottom flex flex-col items-center", color)}
+      style={{ height: `${length}px` }}
+    >
+      <span className={cn("text-xs font-bold bg-background/50 backdrop-blur-sm rounded-sm px-1 mb-1", color)}>{label}</span>
+      <div className="w-12 h-full flex justify-center items-end">
+          <Needle color={color} />
+      </div>
     </div>
   </div>
 );
@@ -50,23 +53,31 @@ const Compass: FC<CompassProps> = ({
 
   useEffect(() => {
     if (roseRef.current) {
-      const prevHeading = prevHeadingRef.current;
-      let newHeading = heading;
+      let currentHeading = prevHeadingRef.current;
+      let targetHeading = heading;
       
-      const diff = newHeading - prevHeading;
-
+      const diff = targetHeading - currentHeading;
+      
       // If we've jumped more than 180 degrees, it's shorter to go the other way
       if (Math.abs(diff) > 180) {
         if (diff > 0) {
-          newHeading = prevHeading - (360 - diff);
+          currentHeading += 360;
         } else {
-          newHeading = prevHeading + (360 + diff);
+          currentHeading -= 360;
         }
       }
+      
+      // Use a temporary non-animated state to bridge the gap
+      roseRef.current.style.transition = 'none';
+      roseRef.current.style.transform = `rotate(${-currentHeading}deg)`;
+      
+      // Force a reflow
+      roseRef.current.getBoundingClientRect(); 
 
+      // Apply the animation to the target
       roseRef.current.style.transition = 'transform 0.5s ease-out';
-      roseRef.current.style.transform = `rotate(${-newHeading}deg)`;
-
+      roseRef.current.style.transform = `rotate(${-targetHeading}deg)`;
+      
       prevHeadingRef.current = heading;
     }
   }, [heading]);
@@ -124,15 +135,15 @@ const Compass: FC<CompassProps> = ({
       </div>
 
       <div className="absolute w-full h-full pointer-events-none">
-        { (gameState === 'playing' || gameState === 'results') && <Arrow angle={northAngle} color="text-red-500" label="NORTH" offset={10} /> }
+        { (gameState === 'playing' || gameState === 'results') && <Arrow angle={northAngle} color="text-red-500" label="NORTH" length={130} /> }
         
         {gameState === 'results' && (
           <>
             {targetAngle !== null && targetAngle !== undefined && (
-              <Arrow angle={displayTargetAngle} color="text-accent" label="TARGET" offset={50} />
+              <Arrow angle={displayTargetAngle} color="text-accent" label="TARGET" length={110} />
             )}
             {guessAngle !== null && guessAngle !== undefined && (
-              <Arrow angle={displayGuessAngle} color="text-primary" label="GUESS" offset={90} />
+              <Arrow angle={displayGuessAngle} color="text-primary" label="GUESS" length={90} />
             )}
           </>
         )}
