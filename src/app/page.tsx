@@ -145,7 +145,7 @@ export default function Home() {
             <DialogContent className="sm:max-w-md">
               <DialogHeader>
                 <DialogTitle>Scan to play on your phone</DialogTitle>
-              </Header>
+              </DialogHeader>
               <div className="flex items-center justify-center p-4">
                 <QRCode value={appUrl} size={256} />
               </div>
