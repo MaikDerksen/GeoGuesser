@@ -44,7 +44,7 @@ export default function Home() {
                     <Button onClick={handleGrantPermission} size="lg">Grant Permission</Button>
                 </CardContent>
             </Card>
-        )
+        );
       case 'mode_selection':
         return (
             <Card className="text-center max-w-md">
@@ -61,7 +61,7 @@ export default function Home() {
                     }} size="lg" disabled>Near Me</Button>
                 </CardContent>
             </Card>
-        )
+        );
       case 'loading_location':
         return (
             <div className="flex flex-col items-center gap-4 text-center">
