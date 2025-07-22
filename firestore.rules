@@ -9,63 +9,34 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    function isLobbyHost(lobbyData) {
-      return isSignedIn() && request.auth.uid == lobbyData.hostId;
+    function isUser(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+    
+    function getLobby() {
+      return get(/databases/$(database)/documents/lobbies/$(lobbyId)).data;
+    }
+    
+    function isHost(uid) {
+        return uid == getLobby().hostId;
     }
 
-    function isPlayerInLobby(lobbyData) {
-      return isSignedIn() && request.auth.uid in lobbyData.players.keys();
-    }
-    
-    function playerIsJoining(requestData, resourceData) {
-      let playerListBefore = resourceData.data.players;
-      let playerListAfter = requestData.players;
-      // Check if the user is adding themselves to the list
-      return playerListAfter.size() == playerListBefore.size() + 1 &&
-             !isPlayerInLobby(resource.data) && isPlayerInLobby(request.resource.data);
-    }
-    
-    function playerIsLeaving(requestData, resourceData) {
-       let playerListBefore = resourceData.data.players;
-       let playerListAfter = requestData.players;
-       // Check if the user is removing themselves from the list
-       return playerListAfter.size() == playerListBefore.size() - 1 &&
-              isPlayerInLobby(resource.data) && !isPlayerInLobby(request.resource.data);
+    function isPlayer(uid) {
+        return uid in getLobby().players.map(p => p.uid);
     }
 
-    function onlyOwnPlayerDataChanged(requestData, resourceData) {
-        let otherPlayerIds = resourceData.data.players.keys().removeAll([request.auth.uid]);
-        let unchanged = true;
-        // Loop through other players to ensure their data hasn't changed
-        // This is a simplified check. A more robust check would compare maps.
-        // For our case, we assume if their map exists with the same key, it's ok.
-        // A more granular check would compare score and guesses fields.
-        forall pId in otherPlayerIds {
-          unchanged = unchanged && (requestData.players[pId] == resourceData.data.players[pId])
-        }
-        return unchanged;
-    }
-    
     match /lobbies/{lobbyId} {
       allow read: if true;
       
-      allow create: if isSignedIn() && isLobbyHost(request.resource.data);
-
-      allow update: if isSignedIn() &&
-        // Case 1: The host is making changes
-        (isLobbyHost(resource.data)) ||
-        // Case 2: A player is joining a lobby that is 'waiting'
-        (playerIsJoining(request.resource.data, resource) && resource.data.status == 'waiting') ||
-        // Case 3: A player is leaving
-        (playerIsLeaving(request.resource.data, resource)) ||
-        // Case 4: Player in the game is updating *only* their own score/guess data.
-        (isPlayerInLobby(resource.data) && onlyOwnPlayerDataChanged(request.resource.data, resource));
-        
-      allow delete: if isSignedIn() && isLobbyHost(resource.data);
+      allow create: if isSignedIn();
       
-      // Players subcollection for future use if needed, deny all for now.
+      allow update: if isSignedIn() && (isHost(request.auth.uid) || isPlayer(request.auth.uid));
+
+      allow delete: if isSignedIn() && isHost(request.auth.uid);
+
       match /players/{playerId} {
-        allow read, write: if false;
+        allow read: if true;
+        allow create, update, delete: if isUser(playerId) || isHost(request.auth.uid);
       }
     }
   }
