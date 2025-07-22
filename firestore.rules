@@ -3,28 +3,50 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
+    // Helper functions
     function isSignedIn() {
       return request.auth != null;
     }
 
-    function isPlayer(lobbyId) {
-      return request.auth.uid in get(/databases/$(database)/documents/lobbies/$(lobbyId)).data.players.map(p => p.uid);
+    function isPlayerInLobby(lobbyData) {
+      return request.auth.uid in lobbyData.players;
     }
 
-    function isHost(lobbyId) {
-      return request.auth.uid == get(/databases/$(database)/documents/lobbies/$(lobbyId)).data.hostId;
+    function isHost(lobbyData) {
+      return request.auth.uid == lobbyData.hostId;
     }
 
+    // Rules for lobbies collection
     match /lobbies/{lobbyId} {
       allow read;
+      
       allow create: if isSignedIn();
-      allow update: if isSignedIn() && isPlayer(lobbyId);
-      allow delete: if isSignedIn() && isHost(lobbyId);
+      
+      allow update: if 
+        // Ensure user is signed in and part of the lobby
+        isSignedIn() && isPlayerInLobby(resource.data) &&
+        (
+          // CASE 1: The user is the host
+          isHost(resource.data) ||
+          // CASE 2: The user is a player updating only their own data
+          (
+            // Check that the incoming write request only modifies the 'players' field
+            request.resource.data.diff(resource.data).affectedKeys()
+                .hasOnly(['players']) &&
+            // Check that the list of player UIDs hasn't changed
+            request.resource.data.players.keys() == resource.data.players.keys() &&
+            // Check that the current player is only modifying their own map entry
+            request.resource.data.players[request.auth.uid].diff(resource.data.players[request.auth.uid])
+                .affectedKeys().hasOnly(['score', 'guesses'])
+          )
+        );
 
-      match /players/{playerId} {
-        // Players subcollection is not used in the current implementation
-        allow read, write: if false;
-      }
+      allow delete: if isHost(resource.data);
+    }
+    
+    // Disallow reads/writes to the players subcollection directly for now
+    match /lobbies/{lobbyId}/players/{playerId} {
+      allow read, write: if false;
     }
   }
 }
