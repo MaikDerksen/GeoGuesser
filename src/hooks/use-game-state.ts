@@ -12,8 +12,20 @@ import type { User } from 'firebase/auth';
 import { getNearbyLocations } from '@/ai/flows/get-nearby-locations';
 
 
-type GameState = 'idle' | 'mode_selection' | 'permission' | 'loading_location' | 'playing' | 'results';
+type GameState = 'idle' | 'mode_selection' | 'permission' | 'customizing_near_me' | 'loading_location' | 'playing' | 'results';
 type GameMode = keyof typeof locationPacks | 'NEAR_ME';
+
+interface NearMeOptions {
+    radius: number;
+    categories: {
+        restaurants: boolean;
+        culture: boolean;
+        shopping: boolean;
+        hotels: boolean;
+        infrastructure: boolean;
+        landmarks: boolean;
+    }
+}
 
 const TOTAL_ROUNDS = 7;
 const ROUND_TIMER = 15;
@@ -35,6 +47,18 @@ export function useGameState(user: User | null) {
 
   const { data: userLocation, loading: locationLoading, error: locationError, getLocation } = useGeolocation();
   const { orientation, error: orientationError, requestPermission, permissionState } = useDeviceOrientation();
+
+  const [nearMeOptions, setNearMeOptions] = useState<NearMeOptions>({
+      radius: 10,
+      categories: {
+          restaurants: true,
+          culture: true,
+          shopping: true,
+          hotels: false,
+          infrastructure: false,
+          landmarks: true,
+      }
+  });
 
   // Set App URL for QR Code
   useEffect(() => {
@@ -125,15 +149,13 @@ export function useGameState(user: User | null) {
   }, [currentLocationSet, resetGame, toast, target?.name]);
 
 
-  const prepareGame = useCallback(async (mode: GameMode) => {
-    setGameMode(mode);
+  const prepareGame = useCallback(async () => {
     setCurrentRound(0);
     setScore(0);
     setGameState('loading_location');
     setGameLoading(true);
 
     getLocation(); // This is async, we'll react to its completion in the effect below
-
   }, [getLocation]);
 
    // This effect chain handles the entire game setup process once a mode is selected.
@@ -152,9 +174,26 @@ export function useGameState(user: User | null) {
         try {
             let locations: Location[] = [];
             if (gameMode === 'NEAR_ME') {
-                locations = await getNearbyLocations({ latitude: userLocation.latitude, longitude: userLocation.longitude });
+                const selectedCategories = Object.entries(nearMeOptions.categories)
+                    .filter(([, value]) => value)
+                    .map(([key]) => key);
+
+                if (selectedCategories.length === 0) {
+                    toast({ title: "No Categories", description: "Please select at least one category for 'Near Me' mode.", variant: "destructive" });
+                    setGameState('customizing_near_me');
+                    setGameLoading(false);
+                    return;
+                }
+
+                locations = await getNearbyLocations({ 
+                    latitude: userLocation.latitude, 
+                    longitude: userLocation.longitude,
+                    radius: nearMeOptions.radius,
+                    categories: selectedCategories,
+                });
+
                 if (locations.length < TOTAL_ROUNDS) {
-                    toast({ title: "Not Enough Locations", description: "Could not find enough nearby locations. Try a different mode.", variant: "destructive" });
+                    toast({ title: "Not Enough Locations", description: "Could not find enough nearby locations with the selected options. Try expanding your radius or adding categories.", variant: "destructive" });
                     resetGame();
                     return;
                 }
@@ -172,21 +211,36 @@ export function useGameState(user: User | null) {
     
     setupGame();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [gameState, gameMode, locationLoading, userLocation, locationError]);
+  }, [gameState, gameMode, locationLoading, userLocation, locationError, nearMeOptions]);
 
 
   const handleSetGameMode = useCallback((mode: GameMode) => {
+    setGameMode(mode);
+    if (mode === 'NEAR_ME') {
+      setGameState('customizing_near_me');
+      return;
+    }
+    
     if (permissionState === 'prompt' || (permissionState === 'not-supported' && typeof (DeviceOrientationEvent as any).requestPermission === 'function')) {
       setGameState('permission');
-      setGameMode(mode); // Store the mode to continue after permission
     } else if (permissionState === 'granted') {
-      prepareGame(mode);
+      prepareGame();
     } else {
       toast({ title: "Permission Required", description: "Device orientation permission is required to play. Please enable it in your browser settings.", variant: "destructive"});
       setGameState('idle');
     }
   }, [permissionState, toast, prepareGame]);
 
+  const handleStartNearMe = useCallback(() => {
+     if (permissionState === 'prompt' || (permissionState === 'not-supported' && typeof (DeviceOrientationEvent as any).requestPermission === 'function')) {
+      setGameState('permission');
+    } else if (permissionState === 'granted') {
+      prepareGame();
+    } else {
+      toast({ title: "Permission Required", description: "Device orientation permission is required to play. Please enable it in your browser settings.", variant: "destructive"});
+      setGameState('idle');
+    }
+  }, [permissionState, prepareGame, toast]);
 
   // Handle starting the game or next round
   const handleStart = useCallback(() => {
@@ -202,7 +256,7 @@ export function useGameState(user: User | null) {
   const handleGrantPermission = async () => {
     const status = await requestPermission();
     if (status === 'granted' && gameMode) {
-        prepareGame(gameMode);
+        prepareGame();
     } else {
         setGameState('idle');
         setGameMode(null);
@@ -230,13 +284,16 @@ export function useGameState(user: User | null) {
     targetBearing,
     userGuess,
     appUrl,
+    gameMode,
+    loading: gameLoading,
+    nearMeOptions,
+    setNearMeOptions,
     handleSetGameMode,
     handleStart,
     handleGuess,
     handleGrantPermission,
     permissionState,
     resetGame,
-    gameMode,
-    loading: gameLoading,
+    handleStartNearMe,
   };
 }

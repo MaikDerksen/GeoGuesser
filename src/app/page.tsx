@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react';
 import Compass from '@/components/compass';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Loader2, Compass as CompassIcon, QrCode, LogOut, Users, Play, Pin } from 'lucide-react';
+import { Loader2, Compass as CompassIcon, QrCode, LogOut, Users, Play, Pin, Settings } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import QRCode from "qrcode.react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
@@ -13,11 +13,14 @@ import { useGameState } from '@/hooks/use-game-state';
 import { Progress } from '@/components/ui/progress';
 import { useAuth } from '@/hooks/use-auth';
 import { useRouter } from 'next/navigation';
+import { Label } from '@/components/ui/label';
+import { Slider } from '@/components/ui/slider';
+import { Switch } from '@/components/ui/switch';
+
 
 export default function Home() {
   const { user, loading: authLoading, signOut } = useAuth();
   const router = useRouter();
-  const [isMultiplayer, setIsMultiplayer] = useState(false);
   
   const {
     gameState,
@@ -39,6 +42,9 @@ export default function Home() {
     permissionState,
     resetGame,
     loading: gameLoading,
+    nearMeOptions,
+    setNearMeOptions,
+    handleStartNearMe,
   } = useGameState(user);
 
   useEffect(() => {
@@ -47,8 +53,8 @@ export default function Home() {
     }
   }, [authLoading, user, router]);
 
+
   const handleModeSelection = (multiplayer: boolean) => {
-    setIsMultiplayer(multiplayer);
     if(multiplayer) {
       router.push('/lobby');
     } else {
@@ -100,6 +106,53 @@ export default function Home() {
                 </CardContent>
             </Card>
         );
+      case 'customizing_near_me':
+        return (
+             <Card className="w-full max-w-md">
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-2"><Settings className="h-6 w-6"/> Customize "Near Me"</CardTitle>
+                    <CardDescription>Adjust the settings for your local game.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                    <div className="space-y-4">
+                        <div className="flex justify-between items-center">
+                            <Label htmlFor="radius">Search Radius</Label>
+                            <span className="text-sm font-medium text-primary">{nearMeOptions.radius} km</span>
+                        </div>
+                        <Slider
+                            id="radius"
+                            min={1}
+                            max={50}
+                            step={1}
+                            value={[nearMeOptions.radius]}
+                            onValueChange={(value) => setNearMeOptions(prev => ({ ...prev, radius: value[0] }))}
+                        />
+                    </div>
+                     <div className="space-y-4">
+                        <Label>Location Categories</Label>
+                        <div className="grid grid-cols-2 gap-4">
+                            {Object.entries(nearMeOptions.categories).map(([key, value]) => (
+                                <div key={key} className="flex items-center space-x-2">
+                                    <Switch
+                                        id={key}
+                                        checked={value}
+                                        onCheckedChange={(checked) => setNearMeOptions(prev => ({
+                                            ...prev,
+                                            categories: { ...prev.categories, [key]: checked }
+                                        }))}
+                                    />
+                                    <Label htmlFor={key} className="capitalize">{key}</Label>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                    <Button onClick={handleStartNearMe} className="w-full" disabled={gameLoading}>
+                        { gameLoading ? <Loader2 className="animate-spin"/> : "Start Game" }
+                    </Button>
+                     <Button variant="link" onClick={() => setGameState('mode_selection')}>Back</Button>
+                </CardContent>
+            </Card>
+        )
       case 'loading_location':
         return (
             <div className="flex flex-col items-center gap-4 text-center">
