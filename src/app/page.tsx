@@ -1,102 +1,35 @@
 "use client";
 
-import { useState, useEffect, useMemo } from 'react';
+import { useMemo } from 'react';
 import Compass from '@/components/compass';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { useGeolocation } from '@/hooks/use-geolocation';
-import { useDeviceOrientation } from '@/hooks/use-device-orientation';
-import type { Location } from '@/lib/locations';
-import { locations } from '@/lib/locations';
-import { calculateBearing } from '@/lib/geo';
 import { Loader2, Compass as CompassIcon, QrCode } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import QRCode from "qrcode.react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-
-
-type GameState = 'idle' | 'permission' | 'loading_location' | 'playing' | 'results';
+import { useGameState } from '@/hooks/use-game-state';
+import { Progress } from '@/components/ui/progress';
 
 export default function Home() {
-  const [gameState, setGameState] = useState<GameState>('idle');
-  const [target, setTarget] = useState<Location | null>(null);
-  const [userGuess, setUserGuess] = useState<number | null>(null);
-  const [appUrl, setAppUrl] = useState('');
-  const { toast } = useToast();
+  const {
+    gameState,
+    score,
+    currentRound,
+    totalRounds,
+    timeLeft,
+    target,
+    heading,
+    targetBearing,
+    userGuess,
+    appUrl,
+    handleSetGameMode,
+    handleStart,
+    handleGuess,
+    handleGrantPermission,
+    permissionState
+  } = useGameState();
 
-  const { data: userLocation, loading: locationLoading, error: locationError, getLocation } = useGeolocation();
-  const { orientation, error: orientationError, requestPermission, permissionState } = useDeviceOrientation();
-
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      setAppUrl(window.location.origin);
-    }
-  }, []);
-
-  const heading = useMemo(() => {
-    if (!orientation) return 0;
-    if (orientation.webkitCompassHeading) {
-      return orientation.webkitCompassHeading;
-    }
-    return orientation.alpha !== null ? 360 - orientation.alpha : 0;
-  }, [orientation]);
-
-  const targetBearing = useMemo(() => {
-    if (!userLocation || !target) return null;
-    return calculateBearing(
-      userLocation.latitude,
-      userLocation.longitude,
-      target.coordinates.latitude,
-      target.coordinates.longitude
-    );
-  }, [userLocation, target]);
-
-  const handleStart = () => {
-    if (permissionState === 'prompt' || permissionState === 'not-supported' && typeof (DeviceOrientationEvent as any).requestPermission === 'function') {
-      setGameState('permission');
-    } else if (permissionState === 'granted') {
-      startNewRound();
-    } else {
-      toast({ title: "Permission Required", description: "Device orientation permission is required to play. Please enable it in your browser settings.", variant: "destructive"});
-    }
-  };
-
-  const handleGrantPermission = async () => {
-    const status = await requestPermission();
-    if (status === 'granted') {
-        startNewRound();
-    } else {
-        setGameState('idle');
-        toast({ title: "Permission Denied", description: "Permission for device orientation was denied. The game cannot start.", variant: "destructive"});
-    }
-  }
-
-  const startNewRound = () => {
-    setGameState('loading_location');
-    setUserGuess(null);
-    const randomLocation = locations[Math.floor(Math.random() * locations.length)];
-    setTarget(randomLocation);
-    getLocation();
-  };
-
-  useEffect(() => {
-    if (gameState === 'loading_location' && !locationLoading) {
-      if (userLocation) {
-        setGameState('playing');
-      }
-      if (locationError) {
-        setGameState('idle');
-        toast({ title: "Location Error", description: `Could not get your location: ${locationError.message}`, variant: "destructive"});
-      }
-    }
-  }, [gameState, locationLoading, userLocation, locationError, toast]);
-
-
-  const handleGuess = (angle: number) => {
-    if (gameState !== 'playing') return;
-    setUserGuess(angle);
-    setGameState('results');
-  };
 
   const renderContent = () => {
     switch (gameState) {
@@ -112,6 +45,23 @@ export default function Home() {
                 </CardContent>
             </Card>
         )
+      case 'mode_selection':
+        return (
+            <Card className="text-center max-w-md">
+                <CardHeader>
+                    <CardTitle>Choose a Game Mode</CardTitle>
+                    <CardDescription>Select a set of locations to play with.</CardDescription>
+                </CardHeader>
+                <CardContent className="grid grid-cols-2 gap-4">
+                    <Button onClick={() => handleSetGameMode('USA')} size="lg">USA</Button>
+                    <Button onClick={() => handleSetGameMode('EU')} size="lg">Europe</Button>
+                    <Button onClick={() => handleSetGameMode('ASIA')} size="lg">Asia</Button>
+                    <Button onClick={() => {
+                        // Near me is not implemented yet
+                    }} size="lg" disabled>Near Me</Button>
+                </CardContent>
+            </Card>
+        )
       case 'loading_location':
         return (
             <div className="flex flex-col items-center gap-4 text-center">
@@ -122,7 +72,15 @@ export default function Home() {
         );
       case 'playing':
         return (
-          <div className="flex flex-col items-center gap-6">
+          <div className="flex flex-col items-center gap-6 w-full max-w-md">
+            <div className="w-full flex justify-between items-center text-lg font-semibold">
+                <span>Round: {currentRound}/{totalRounds}</span>
+                <span>Score: {score}</span>
+            </div>
+             <div className="w-full space-y-2">
+                <Progress value={(timeLeft / 15) * 100} className="h-2" />
+                <p className="text-center text-sm text-muted-foreground">Time left: {timeLeft}s</p>
+            </div>
             <h2 className="text-2xl font-semibold text-center">Find: <span className="text-primary font-bold">{target?.name}</span></h2>
             <p className="text-muted-foreground text-center">Point your device and tap the compass to guess.</p>
             <Compass heading={heading} onGuess={handleGuess} gameState={gameState} />
@@ -130,20 +88,27 @@ export default function Home() {
         );
       case 'results':
         const difference = userGuess !== null && targetBearing !== null ? Math.min(Math.abs(userGuess - targetBearing), 360 - Math.abs(userGuess - targetBearing)) : 0;
+        const roundPoints = Math.max(0, 360 - Math.floor(difference));
+        
+        const isLastRound = currentRound === totalRounds;
+
         return (
             <div className="flex flex-col items-center gap-6">
-                <h2 className="text-2xl font-semibold text-center">Result for: <span className="text-primary font-bold">{target?.name}</span></h2>
+                <h2 className="text-2xl font-semibold text-center">
+                    {isLastRound ? 'Final Score' : `Round ${currentRound} Complete`}
+                </h2>
+                 {!isLastRound && <p className="text-primary font-bold text-xl">+{roundPoints} points</p> }
                 <Compass heading={heading} gameState={gameState} guessAngle={userGuess} targetAngle={targetBearing} />
                 <Card className="text-center w-full max-w-sm">
                     <CardHeader>
-                        <CardTitle>You were off by {difference.toFixed(1)}°</CardTitle>
+                       <CardTitle>{isLastRound ? `Total Score: ${score}` : `You were off by ${difference.toFixed(1)}°`}</CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-4">
                          <div className="flex justify-around gap-4">
                             <div><p className="text-sm text-primary">Your Guess</p><p className="text-2xl font-bold">{userGuess?.toFixed(1)}°</p></div>
                             <div><p className="text-sm text-accent">Actual</p><p className="text-2xl font-bold">{targetBearing?.toFixed(1)}°</p></div>
                          </div>
-                         <Button onClick={handleStart}>Play Again</Button>
+                         <Button onClick={handleStart}>{isLastRound ? "Play Again" : "Next Round"}</Button>
                     </CardContent>
                 </Card>
             </div>
@@ -155,9 +120,9 @@ export default function Home() {
               <CardTitle className="text-4xl font-headline flex items-center justify-center gap-2"><CompassIcon className="h-10 w-10 text-primary" /> GeoCompass</CardTitle>
               <CardDescription>Guess the direction of famous landmarks!</CardDescription>
             </CardHeader>
-            <CardContent>
-              <p className="mb-4">Point your device to where you think the target is and make your guess. Your phone's compass and GPS will be used.</p>
-              <Button onClick={handleStart} size="lg">Start Game</Button>
+            <CardContent className="flex flex-col gap-4">
+              <Button onClick={handleStart} size="lg">Single Player</Button>
+              <Button variant="secondary" size="lg" disabled>Multiplayer</Button>
             </CardContent>
           </Card>
         );
@@ -180,7 +145,7 @@ export default function Home() {
             <DialogContent className="sm:max-w-md">
               <DialogHeader>
                 <DialogTitle>Scan to play on your phone</DialogTitle>
-              </DialogHeader>
+              </Header>
               <div className="flex items-center justify-center p-4">
                 <QRCode value={appUrl} size={256} />
               </div>
