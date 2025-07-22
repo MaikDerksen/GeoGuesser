@@ -2,7 +2,6 @@
 
 import { type FC, useRef, useEffect } from 'react';
 import { cn } from '@/lib/utils';
-import { Navigation } from 'lucide-react';
 
 interface CompassProps {
   heading: number;
@@ -13,14 +12,25 @@ interface CompassProps {
   className?: string;
 }
 
+const Needle: FC<{ color: string; }> = ({ color }) => (
+    <svg width="12" height="140" viewBox="0 0 12 140" fill="none" xmlns="http://www.w3.org/2000/svg" className="drop-shadow-md">
+        <path d="M6 0L11.7735 15H0.226497L6 0Z" className={cn("fill-current", color)} />
+        <path d="M5 14L5 139" className={cn("stroke-current", color)} strokeWidth="2"/>
+        <path d="M7 14L7 139" className={cn("stroke-current", color)} strokeWidth="2"/>
+    </svg>
+);
+
+
 const Arrow: FC<{ angle: number; color: string; label: string; offset: number }> = ({ angle, color, label, offset }) => (
   <div
-    className="absolute w-full h-full transition-transform duration-500 ease-out"
+    className="absolute w-full h-full transition-transform duration-500 ease-out origin-center"
     style={{ transform: `rotate(${angle}deg)` }}
   >
-    <div className={`absolute left-1/2 -translate-x-1/2 flex flex-col items-center`} style={{ top: `${offset}px` }}>
-      <Navigation className={cn("h-8 w-8", color)} />
-      <span className={cn("text-xs font-bold", color)}>{label}</span>
+    <div className={cn(`absolute left-1/2 -translate-x-1/2 flex flex-col items-center`, color)} style={{ top: `${offset}px` }}>
+        <div className="w-12 h-[140px] flex justify-center items-start">
+             <Needle color={color} />
+        </div>
+      <span className={cn("text-xs font-bold bg-background/50 backdrop-blur-sm rounded-sm px-1", color)}>{label}</span>
     </div>
   </div>
 );
@@ -48,23 +58,14 @@ const Compass: FC<CompassProps> = ({
       // If we've jumped more than 180 degrees, it's shorter to go the other way
       if (Math.abs(diff) > 180) {
         if (diff > 0) {
-          newHeading -= 360;
+          newHeading = prevHeading - (360 - diff);
         } else {
-          newHeading += 360;
+          newHeading = prevHeading + (360 + diff);
         }
       }
 
-      // We apply the rotation and then quickly snap it back to the 0-360 range
-      // so the next rotation is calculated correctly.
       roseRef.current.style.transition = 'transform 0.5s ease-out';
       roseRef.current.style.transform = `rotate(${-newHeading}deg)`;
-      
-      setTimeout(() => {
-          if (roseRef.current) {
-            roseRef.current.style.transition = 'none';
-            roseRef.current.style.transform = `rotate(${-heading}deg)`;
-          }
-      }, 500);
 
       prevHeadingRef.current = heading;
     }
