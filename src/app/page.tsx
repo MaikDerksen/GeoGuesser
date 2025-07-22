@@ -129,6 +129,20 @@ export default function Home() {
                         />
                     </div>
                      <div className="space-y-4">
+                        <div className="flex justify-between items-center">
+                            <Label htmlFor="rounds">Rounds</Label>
+                            <span className="text-sm font-medium text-primary">{nearMeOptions.rounds}</span>
+                        </div>
+                        <Slider
+                            id="rounds"
+                            min={1}
+                            max={20}
+                            step={1}
+                            value={[nearMeOptions.rounds]}
+                            onValueChange={(value) => setNearMeOptions(prev => ({ ...prev, rounds: value[0] }))}
+                        />
+                    </div>
+                     <div className="space-y-4">
                         <Label>Location Categories</Label>
                         <div className="grid grid-cols-2 gap-4">
                             {Object.entries(nearMeOptions.categories).map(([key, value]) => (
@@ -255,3 +269,5 @@ export default function Home() {
     </main>
   );
 }
+
+    

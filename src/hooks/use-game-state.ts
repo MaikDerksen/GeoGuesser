@@ -17,6 +17,7 @@ type GameMode = keyof typeof locationPacks | 'NEAR_ME';
 
 interface NearMeOptions {
     radius: number;
+    rounds: number;
     categories: {
         restaurants: boolean;
         culture: boolean;
@@ -27,7 +28,6 @@ interface NearMeOptions {
     }
 }
 
-const TOTAL_ROUNDS = 7;
 const ROUND_TIMER = 15;
 
 export function useGameState(user: User | null) {
@@ -50,6 +50,7 @@ export function useGameState(user: User | null) {
 
   const [nearMeOptions, setNearMeOptions] = useState<NearMeOptions>({
       radius: 10,
+      rounds: 7,
       categories: {
           restaurants: true,
           culture: true,
@@ -59,6 +60,13 @@ export function useGameState(user: User | null) {
           landmarks: true,
       }
   });
+
+  const totalRounds = useMemo(() => {
+    if (gameMode === 'NEAR_ME') {
+        return nearMeOptions.rounds;
+    }
+    return 7; // Default for other modes
+  }, [gameMode, nearMeOptions.rounds]);
 
   // Set App URL for QR Code
   useEffect(() => {
@@ -185,20 +193,30 @@ export function useGameState(user: User | null) {
                     return;
                 }
 
-                locations = await getNearbyLocations({ 
+                const aiLocations = await getNearbyLocations({ 
                     latitude: userLocation.latitude, 
                     longitude: userLocation.longitude,
                     radius: nearMeOptions.radius,
                     categories: selectedCategories,
                 });
 
-                if (locations.length < TOTAL_ROUNDS) {
-                    toast({ title: "Not Enough Locations", description: "Could not find enough nearby locations with the selected options. Try expanding your radius or adding categories.", variant: "destructive" });
+                // Filter for unique locations client-side to be certain
+                const uniqueLocations = aiLocations.filter((location, index, self) =>
+                    index === self.findIndex((l) => (
+                        l.name === location.name
+                    ))
+                );
+
+                locations = uniqueLocations;
+
+
+                if (locations.length < nearMeOptions.rounds) {
+                    toast({ title: "Not Enough Locations", description: `Could only find ${locations.length} unique locations. Try expanding your radius or adding categories.`, variant: "destructive" });
                     resetGame();
                     return;
                 }
             } else {
-                locations = locationPacks[gameMode];
+                locations = locationPacks[gameMode as keyof typeof locationPacks];
             }
             setCurrentLocationSet(locations);
             startNewRound(locations); // Directly start the first round with the new locations
@@ -245,13 +263,13 @@ export function useGameState(user: User | null) {
   // Handle starting the game or next round
   const handleStart = useCallback(() => {
     if (gameState === 'results') {
-       if (currentRound >= TOTAL_ROUNDS) {
+       if (currentRound >= totalRounds) {
             resetGame();
        } else {
             startNewRound();
        }
     }
-  }, [gameState, currentRound, startNewRound, resetGame]);
+  }, [gameState, currentRound, totalRounds, startNewRound, resetGame]);
 
   const handleGrantPermission = async () => {
     const status = await requestPermission();
@@ -277,7 +295,7 @@ export function useGameState(user: User | null) {
     setGameState,
     score,
     currentRound,
-    totalRounds: TOTAL_ROUNDS,
+    totalRounds,
     timeLeft,
     target,
     heading,
@@ -297,3 +315,5 @@ export function useGameState(user: User | null) {
     handleStartNearMe,
   };
 }
+
+    
