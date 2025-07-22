@@ -12,33 +12,63 @@ interface CompassProps {
   className?: string;
 }
 
-const Needle: FC<{ color: string; length: number, label: string }> = ({ color, length, label }) => (
-  <div className="relative w-2 h-full">
-    <div
-      className="absolute bottom-1/2 left-0 w-full"
-      style={{ height: length }}
-    >
-      <div className={cn("absolute bottom-0 left-0 w-full h-full bg-current", color)} />
+const Needle: FC<{ color: string; length: number; label: string }> = ({ color, length, label }) => (
+    <div className="relative w-2 h-full">
       <div
-        className={cn("absolute -top-3 left-1/2 -translate-x-1/2 w-0 h-0 border-x-8 border-x-transparent border-b-[16px]", color, 'border-b-current')}
-      />
+        className="absolute bottom-1/2 left-0 w-full origin-bottom"
+        style={{ height: length }}
+      >
+        <div className={cn("absolute bottom-0 left-0 w-full h-full bg-current", color)} style={{ clipPath: 'polygon(50% 0, 100% 100%, 0 100%)'}}/>
+      </div>
+      <div className={cn("absolute left-1/2 -translate-x-1/2 text-xs font-bold whitespace-nowrap px-2 py-1 rounded-full text-white", color.replace("text-", "bg-"))} style={{ top: `calc(50% - ${length}px - 2rem)` }}>
+        {label}
+      </div>
     </div>
-     <div className="absolute top-1/2 -mt-20 left-1/2 -translate-x-1/2 text-xs font-bold" style={{ transform: 'rotate(-90deg) translateX(15px)' }}>
-      {label}
-    </div>
-  </div>
-);
+  );
+  
 
-const Arrow: FC<{ angle: number; color: string; label: string; length: number; }> = ({ angle, color, label, length }) => (
-  <div
-    className="absolute w-full h-full transition-transform duration-500 ease-out pointer-events-none"
-    style={{ transform: `rotate(${angle}deg)` }}
-  >
-    <div className={cn("absolute w-full h-full flex justify-center items-start", color)}>
-       <Needle color={color} length={length} label={label}/>
-    </div>
-  </div>
-);
+const Arrow: FC<{ angle: number; color: string; label: string; length: number; }> = ({ angle, color, label, length }) => {
+    const arrowRef = useRef<HTMLDivElement>(null);
+    const prevAngleRef = useRef<number>(angle);
+
+    useEffect(() => {
+        if (arrowRef.current) {
+            let currentAngle = prevAngleRef.current;
+            let targetAngle = angle;
+
+            const diff = targetAngle - currentAngle;
+            if (Math.abs(diff) > 180) {
+                if (diff > 0) {
+                    currentAngle += 360;
+                } else {
+                    currentAngle -= 360;
+                }
+            }
+
+            arrowRef.current.style.transition = 'none';
+            arrowRef.current.style.transform = `rotate(${currentAngle}deg)`;
+            
+            arrowRef.current.getBoundingClientRect();
+
+            arrowRef.current.style.transition = 'transform 0.5s ease-out';
+            arrowRef.current.style.transform = `rotate(${targetAngle}deg)`;
+
+            prevAngleRef.current = angle;
+        }
+    }, [angle]);
+
+    return (
+        <div
+            ref={arrowRef}
+            className="absolute w-full h-full pointer-events-none"
+            style={{ transform: `rotate(${angle}deg)` }}
+        >
+            <div className={cn("absolute w-full h-full flex justify-center items-start", color)}>
+                <Needle color={color} length={length} label={label}/>
+            </div>
+        </div>
+    );
+};
 
 const Compass: FC<CompassProps> = ({
   heading,
@@ -60,7 +90,6 @@ const Compass: FC<CompassProps> = ({
       
       const diff = targetHeading - currentHeading;
       
-      // If we've jumped more than 180 degrees, it's shorter to go the other way
       if (Math.abs(diff) > 180) {
         if (diff > 0) {
           currentHeading += 360;
@@ -69,14 +98,11 @@ const Compass: FC<CompassProps> = ({
         }
       }
       
-      // Use a temporary non-animated state to bridge the gap
       roseRef.current.style.transition = 'none';
       roseRef.current.style.transform = `rotate(${-currentHeading}deg)`;
       
-      // Force a reflow
       roseRef.current.getBoundingClientRect(); 
 
-      // Apply the animation to the target
       roseRef.current.style.transition = 'transform 0.5s ease-out';
       roseRef.current.style.transform = `rotate(${-targetHeading}deg)`;
       
@@ -135,7 +161,7 @@ const Compass: FC<CompassProps> = ({
             ))}
         </div>
       </div>
-
+      
       <div className="absolute w-full h-full pointer-events-none">
         { (gameState === 'playing' || gameState === 'results') && <Arrow angle={northAngle} color="text-red-500" label="NORTH" length={130} /> }
         
