@@ -1,3 +1,4 @@
+
 "use client";
 
 import { type FC, useRef, useEffect } from 'react';
@@ -163,15 +164,15 @@ const Compass: FC<CompassProps> = ({
       </div>
       
       <div className="absolute w-full h-full pointer-events-none">
-        { (gameState === 'playing' || gameState === 'results') && <Arrow angle={northAngle} color="text-red-500" label="NORTH" length={130} /> }
+        { (gameState === 'playing' || gameState === 'results') && <Arrow angle={northAngle} color="text-red-500" label="NORTH" length={120} /> }
         
         {gameState === 'results' && (
           <>
             {targetAngle !== null && targetAngle !== undefined && (
-              <Arrow angle={displayTargetAngle} color="text-accent" label="TARGET" length={110} />
+              <Arrow angle={displayTargetAngle} color="text-accent" label="TARGET" length={120} />
             )}
             {guessAngle !== null && guessAngle !== undefined && (
-              <Arrow angle={displayGuessAngle} color="text-primary" label="GUESS" length={90} />
+              <Arrow angle={displayGuessAngle} color="text-primary" label="GUESS" length={120} />
             )}
           </>
         )}
