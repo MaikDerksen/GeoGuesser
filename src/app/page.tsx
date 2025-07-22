@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react';
 import Compass from '@/components/compass';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Loader2, Compass as CompassIcon, QrCode, LogOut, Users, Play } from 'lucide-react';
+import { Loader2, Compass as CompassIcon, QrCode, LogOut, Users, Play, Pin } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import QRCode from "qrcode.react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
@@ -37,6 +37,7 @@ export default function Home() {
     handleGrantPermission,
     permissionState,
     resetGame,
+    loading: gameLoading,
   } = useGameState(user);
 
   useEffect(() => {
@@ -71,7 +72,7 @@ export default function Home() {
              <Card className="text-center max-w-md">
                 <CardHeader>
                     <CardTitle>Permissions Required</CardTitle>
-                    <CardDescription>GeoCompass needs access to your device's motion sensors to work.</CardDescription>
+                    <CardDescription>GeoCompass needs access to your device's motion and location sensors to work.</CardDescription>
                 </CardHeader>
                 <CardContent>
                     <Button onClick={handleGrantPermission} size="lg">Grant Permission</Button>
@@ -89,9 +90,9 @@ export default function Home() {
                     <Button onClick={() => handleSetGameMode('USA')} size="lg">USA</Button>
                     <Button onClick={() => handleSetGameMode('EU')} size="lg">Europe</Button>
                     <Button onClick={() => handleSetGameMode('ASIA')} size="lg">Asia</Button>
-                    <Button onClick={() => {
-                        // Near me is not implemented yet
-                    }} size="lg" disabled>Near Me</Button>
+                    <Button onClick={() => handleSetGameMode('NEAR_ME')} size="lg" disabled={gameLoading}>
+                        { gameLoading ? <Loader2 className="animate-spin" /> : <><Pin /> Near Me</> }
+                    </Button>
                 </CardContent>
                  <CardContent>
                     <Button variant="link" onClick={() => resetGame()}>Back to main menu</Button>
@@ -103,7 +104,7 @@ export default function Home() {
             <div className="flex flex-col items-center gap-4 text-center">
                 <Loader2 className="h-12 w-12 animate-spin text-primary" />
                 <p className="text-lg text-muted-foreground">Acquiring satellite lock...</p>
-                <p className="text-sm text-muted-foreground/80">(Getting your location)</p>
+                <p className="text-sm text-muted-foreground/80">({ gameMode === 'NEAR_ME' ? 'Finding cool places near you' : 'Getting your location'})</p>
             </div>
         );
       case 'playing':

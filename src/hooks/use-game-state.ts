@@ -9,10 +9,11 @@ import { useDeviceOrientation } from '@/hooks/use-device-orientation';
 import { calculateBearing } from '@/lib/geo';
 import { useToast } from "@/hooks/use-toast";
 import type { User } from 'firebase/auth';
+import { getNearbyLocations } from '@/ai/flows/get-nearby-locations';
 
 
 type GameState = 'idle' | 'mode_selection' | 'permission' | 'loading_location' | 'playing' | 'results';
-type GameMode = keyof typeof locationPacks;
+type GameMode = keyof typeof locationPacks | 'NEAR_ME';
 
 const TOTAL_ROUNDS = 7;
 const ROUND_TIMER = 15;
@@ -23,9 +24,11 @@ export function useGameState(user: User | null) {
   const [score, setScore] = useState(0);
   const [currentRound, setCurrentRound] = useState(0);
   const [timeLeft, setTimeLeft] = useState(ROUND_TIMER);
+  const [gameLoading, setGameLoading] = useState(false);
 
   const [target, setTarget] = useState<Location | null>(null);
   const [userGuess, setUserGuess] = useState<number | null>(null);
+  const [currentLocationSet, setCurrentLocationSet] = useState<Location[]>([]);
   
   const [appUrl, setAppUrl] = useState('');
   const { toast } = useToast();
@@ -47,6 +50,8 @@ export function useGameState(user: User | null) {
     setScore(0);
     setUserGuess(null);
     setTarget(null);
+    setCurrentLocationSet([]);
+    setGameLoading(false);
   }, []);
 
   // Memoize heading calculation
@@ -99,41 +104,95 @@ export function useGameState(user: User | null) {
   }, [gameState, timeLeft, heading, handleGuess]);
 
   const startNewRound = useCallback(() => {
-    setGameState('loading_location');
+    if(currentLocationSet.length === 0) {
+        toast({ title: "No Locations", description: "Could not find any locations for the selected game mode.", variant: "destructive"});
+        resetGame();
+        return;
+    }
     setUserGuess(null);
     
-    if (gameMode) {
-      const locations = locationPacks[gameMode];
-      const randomLocation = locations[Math.floor(Math.random() * locations.length)];
-      setTarget(randomLocation);
+    const randomLocation = currentLocationSet[Math.floor(Math.random() * currentLocationSet.length)];
+    // Prevent using the same location twice in a row
+    if (randomLocation.name === target?.name) {
+        startNewRound();
+        return;
     }
+    setTarget(randomLocation);
+    setGameState('playing');
+    setTimeLeft(ROUND_TIMER);
+    setCurrentRound(round => round + 1);
     
-    getLocation();
-  }, [gameMode, getLocation]);
+  }, [currentLocationSet, resetGame, toast, target?.name]);
 
-  const handleSetGameMode = useCallback((mode: GameMode) => {
+
+  const prepareGame = useCallback(async (mode: GameMode) => {
     setGameMode(mode);
     setCurrentRound(0);
     setScore(0);
+    setGameState('loading_location');
+    setGameLoading(true);
+
+    // Get user location first for any mode
+    getLocation();
+
+  }, [getLocation]);
+
+  useEffect(() => {
+    const setupLocations = async () => {
+        if (!gameMode || !userLocation) return;
+        
+        let locations: Location[] = [];
+        try {
+            if (gameMode === 'NEAR_ME') {
+                locations = await getNearbyLocations({ latitude: userLocation.latitude, longitude: userLocation.longitude });
+                if (locations.length < TOTAL_ROUNDS) {
+                    toast({ title: "Not Enough Locations", description: "Could not find enough nearby locations. Try a different mode.", variant: "destructive" });
+                    resetGame();
+                    return;
+                }
+            } else {
+                locations = locationPacks[gameMode];
+            }
+            setCurrentLocationSet(locations);
+
+        } catch (e: any) {
+            toast({ title: "Error", description: `Failed to get locations: ${e.message}`, variant: "destructive"});
+            resetGame();
+        }
+    }
+    if (gameState === 'loading_location' && !locationLoading && userLocation) {
+        setupLocations();
+    }
+  }, [gameState, locationLoading, userLocation, gameMode, resetGame, toast]);
+
+  useEffect(() => {
+    if(currentLocationSet.length > 0) {
+        setGameLoading(false);
+        startNewRound();
+    }
+  }, [currentLocationSet, startNewRound])
+
+
+  const handleSetGameMode = useCallback((mode: GameMode) => {
     if (permissionState === 'prompt' || (permissionState === 'not-supported' && typeof (DeviceOrientationEvent as any).requestPermission === 'function')) {
       setGameState('permission');
+      setGameMode(mode); // Store the mode to continue after permission
     } else if (permissionState === 'granted') {
-      startNewRound();
+      prepareGame(mode);
     } else {
       toast({ title: "Permission Required", description: "Device orientation permission is required to play. Please enable it in your browser settings.", variant: "destructive"});
       setGameState('idle');
     }
-  }, [permissionState, toast, startNewRound]);
+  }, [permissionState, toast, prepareGame]);
 
 
   // Handle starting the game or next round
   const handleStart = useCallback(() => {
-    // This now only handles single player logic continuation.
-    // Multiplayer start is handled in useLobby
     if (gameState === 'results') {
        if (currentRound >= TOTAL_ROUNDS) {
             resetGame();
        } else {
+            setGameState('playing');
             startNewRound();
        }
     }
@@ -141,29 +200,25 @@ export function useGameState(user: User | null) {
 
   const handleGrantPermission = async () => {
     const status = await requestPermission();
-    if (status === 'granted') {
-        startNewRound();
+    if (status === 'granted' && gameMode) {
+        prepareGame(gameMode);
     } else {
         setGameState('idle');
         setGameMode(null);
-        toast({ title: "Permission Denied", description: "Permission for device orientation was denied. The game cannot start.", variant: "destructive"});
+        toast({ title: "Permission Denied", description: "Permission for device sensors was denied. The game cannot start.", variant: "destructive"});
     }
   }
 
-  // Effect to transition from loading to playing
+  // Effect to handle location error
   useEffect(() => {
     if (gameState === 'loading_location' && !locationLoading) {
-      if (userLocation) {
-        setCurrentRound(round => round + 1);
-        setGameState('playing');
-        setTimeLeft(ROUND_TIMER);
-      }
       if (locationError) {
         setGameState('idle');
+        setGameLoading(false);
         toast({ title: "Location Error", description: `Could not get your location: ${locationError.message}`, variant: "destructive"});
       }
     }
-  }, [gameState, locationLoading, userLocation, locationError, toast]);
+  }, [gameState, locationLoading, locationError, toast]);
 
   // Reset to idle if user logs out
   useEffect(() => {
@@ -190,5 +245,7 @@ export function useGameState(user: User | null) {
     handleGrantPermission,
     permissionState,
     resetGame,
+    gameMode,
+    loading: gameLoading,
   };
 }
