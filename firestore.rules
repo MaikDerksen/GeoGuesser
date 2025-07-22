@@ -1,61 +1,55 @@
+
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    
+
+    // Helper functions
     function isSignedIn() {
       return request.auth != null;
     }
 
-    // Helper functions to find the index of the authenticated user in the players list
-    function getPlayerIndex(resource) {
-      // The .get() method with a default value of -1 is a safe way to check for presence.
-      return resource.data.players.map(p => p.uid).indexOf(request.auth.uid);
+    function isHost(lobbyData) {
+      return request.auth.uid == lobbyData.hostId;
     }
 
-    function getIncomingPlayerIndex(request) {
-      return request.resource.data.players.map(p => p.uid).indexOf(request.auth.uid);
+    function isPlayer(lobbyData) {
+      return request.auth.uid in lobbyData.players.map(p => p.uid);
     }
+
+    function playerIsJoining(lobbyData) {
+      let isNewPlayer = !(request.auth.uid in lobbyData.players.map(p => p.uid));
+      let isJoining = request.auth.uid in request.resource.data.players.map(p => p.uid);
+      return isNewPlayer && isJoining;
+    }
+    
+    function onlyOwnPlayerDataChanged(lobbyData) {
+      // For every player in the future state...
+      return request.resource.data.players.forall(player ->
+        // If it's the current user, they can only change their score and guesses.
+        (player.uid == request.auth.uid && player.keys().hasOnly(['uid', 'displayName', 'photoURL', 'score', 'guesses'])) ||
+        // If it's another player, their data must not have changed at all.
+        (player.uid != request.auth.uid && player == lobbyData.players.get(lobbyData.players.indexWhere('uid', '==', player.uid)))
+      );
+    }
+
 
     match /lobbies/{lobbyId} {
-      allow read: if true;
-      
-      allow create: if isSignedIn() && 
-                    request.resource.data.hostId == request.auth.uid &&
-                    request.resource.data.players[0].uid == request.auth.uid;
+      allow read;
 
-      allow update: if isSignedIn() &&
-                    // Either the user is joining a waiting lobby for the first time
-                    (
-                      getPlayerIndex(resource) == -1 &&
-                      getIncomingPlayerIndex(request) != -1 &&
-                      resource.data.status == 'waiting' &&
-                      request.resource.data.players.size() == resource.data.players.size() + 1 &&
-                      request.resource.data.players[getIncomingPlayerIndex(request)].uid == request.auth.uid
-                    ) ||
-                    // Or the user is already in the lobby and making valid game moves
-                    (
-                      getPlayerIndex(resource) != -1 &&
-                      // The player list size cannot change, except for the host removing players
-                      (request.resource.data.players.size() == resource.data.players.size() || request.auth.uid == resource.data.hostId) &&
-                      // A player can only update their own score and guesses
-                      (
-                        request.resource.data.players[getPlayerIndex(resource)].score >= resource.data.players[getPlayerIndex(resource)].score &&
-                        request.resource.data.players[getPlayerIndex(resource)].guesses.size() >= resource.data.players[getPlayerIndex(resource)].guesses.size()
-                      ) &&
-                      // The host is allowed to change the game state
-                      (
-                        request.auth.uid == resource.data.hostId ||
-                        (
-                          request.resource.data.status == resource.data.status &&
-                          request.resource.data.currentRound == resource.data.currentRound &&
-                          request.resource.data.locations == resource.data.locations &&
-                          request.resource.data.gameMode == resource.data.gameMode
-                        )
-                      )
-                    );
+      allow create: if isSignedIn()
+                      && request.resource.data.hostId == request.auth.uid;
 
-      allow delete: if isSignedIn() && request.auth.uid == resource.data.hostId;
+      allow update: if isSignedIn() && (
+        // Case 1: The user is the host. Allow them to change game state.
+        isHost(resource.data) ||
+        
+        // Case 2: A new player is joining a waiting lobby.
+        (playerIsJoining(resource.data) && resource.data.status == 'waiting') ||
+
+        // Case 3: An existing player is updating only their own score/guesses.
+        (isPlayer(resource.data) && onlyOwnPlayerDataChanged(resource.data))
+      );
     }
   }
 }
