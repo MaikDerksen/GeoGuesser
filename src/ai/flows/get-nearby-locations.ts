@@ -42,8 +42,9 @@ const prompt = ai.definePrompt({
     prompt: `You are a virtual tour guide integrated into a location-guessing game.
     A user has provided their current coordinates: latitude {{{latitude}}} and longitude {{{longitude}}}.
     
-    Your task is to generate a list of 7 well-known and interesting landmarks or points of interest that are reasonably close to the user's location.
-    The locations should be diverse and recognizable. Avoid obscure places.
+    Your task is to generate a list of 7 unique and diverse points of interest that are reasonably close to the user's location.
+    The locations should be a mix of well-known landmarks, popular restaurants, notable parks, or significant local businesses. 
+    Ensure every location in the list is unique and avoid obscure or private places.
     
     Return the list as a valid JSON array of objects, where each object has a "name" and "coordinates" (with "latitude" and "longitude").
     Do not include any other text or explanations in your response.`,
