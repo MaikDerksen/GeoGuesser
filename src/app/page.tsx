@@ -21,6 +21,7 @@ export default function Home() {
   
   const {
     gameState,
+    setGameState,
     score,
     currentRound,
     totalRounds,
