@@ -31,6 +31,7 @@ export default function Home() {
     targetBearing,
     userGuess,
     appUrl,
+    gameMode,
     handleSetGameMode,
     handleStart,
     handleGuess,
