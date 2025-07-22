@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "135978667752",
+    "project_id": "geocompass-l29mm",
+    "storage_bucket": "geocompass-l29mm.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:135978667752:android:ba17be531780250569835d",
+        "android_client_info": {
+          "package_name": "com.geocompass"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDLm1o7egrh_Z8J_rXiLyOz_OBIIG-6OI4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

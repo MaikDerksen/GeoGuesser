@@ -33,7 +33,7 @@ export function useGameState() {
 
   // Set App URL for QR Code
   useEffect(() => {
-    if (typeof window !== 'undefined') {
+    if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
       setAppUrl(window.location.origin);
     }
   }, []);
