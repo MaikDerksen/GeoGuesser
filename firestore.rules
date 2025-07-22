@@ -2,60 +2,29 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    // Helper functions
+    
     function isSignedIn() {
       return request.auth != null;
     }
 
-    function isPlayerInLobby(lobbyId) {
-      return isSignedIn() && get(/databases/$(database)/documents/lobbies/$(lobbyId)).data.players.exists(p, p.uid == request.auth.uid);
+    function isPlayer(lobbyId) {
+      return request.auth.uid in get(/databases/$(database)/documents/lobbies/$(lobbyId)).data.players.map(p => p.uid);
     }
-    
-    function isHost(lobby) {
-      return isSignedIn() && request.auth.uid == lobby.hostId;
+
+    function isHost(lobbyId) {
+      return request.auth.uid == get(/databases/$(database)/documents/lobbies/$(lobbyId)).data.hostId;
     }
 
     match /lobbies/{lobbyId} {
-      // ANY authenticated user can create a lobby.
+      allow read;
       allow create: if isSignedIn();
+      allow update: if isSignedIn() && isPlayer(lobbyId);
+      allow delete: if isSignedIn() && isHost(lobbyId);
 
-      // ANY player in the lobby can read its data.
-      allow get: if isPlayerInLobby(lobbyId);
-
-      // Host can delete the lobby.
-      allow delete: if isHost(resource.data);
-
-      // Update permissions
-      allow update: if 
-        // The user must be a player in the lobby to update anything.
-        isPlayerInLobby(lobbyId) &&
-        (
-          // HOST ONLY actions:
-          // The host can change gameMode, locations, currentRound, and status.
-          (isHost(resource.data) &&
-            (request.resource.data.diff(resource.data).affectedKeys()
-              .hasOnly(['gameMode', 'locations', 'currentRound', 'status']))
-          ) ||
-          
-          // PLAYER actions (including host):
-          // Any player can join (add themselves to players array).
-          (request.resource.data.players.size() == resource.data.players.size() + 1 &&
-            request.auth.uid == request.resource.data.players[resource.data.players.size()].uid
-          ) ||
-          
-          // Any player can leave (remove themselves from players array).
-          (request.resource.data.players.size() == resource.data.players.size() - 1 &&
-            !isPlayerInLobby(request.resource.data.id) // check that they are the one who left
-          ) ||
-
-          // Any player can update their own score and guesses.
-          // This is the key change to fix the permission error.
-          (request.resource.data.players.size() == resource.data.players.size() &&
-            request.resource.data.players.diff(resource.data.players).affectedKeys()
-              .hasOnly(request.resource.data.players.filter(p, p.uid == request.auth.uid).keys())
-          )
-        );
+      match /players/{playerId} {
+        // Players subcollection is not used in the current implementation
+        allow read, write: if false;
+      }
     }
   }
 }
