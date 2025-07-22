@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import Compass from '@/components/compass';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -12,16 +12,18 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { useGameState } from '@/hooks/use-game-state';
 import { Progress } from '@/components/ui/progress';
 import { useAuth } from '@/hooks/use-auth';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
 
 
-export default function Home() {
+function HomeComponent() {
   const { user, loading: authLoading, signOut } = useAuth();
   const router = useRouter();
-  
+  const searchParams = useSearchParams();
+  const lobbyId = searchParams.get('lobbyId');
+
   const {
     gameState,
     setGameState,
@@ -45,7 +47,10 @@ export default function Home() {
     nearMeOptions,
     setNearMeOptions,
     handleStartNearMe,
-  } = useGameState(user);
+    isMultiplayer,
+    isHost,
+    lobby,
+  } = useGameState(user, lobbyId);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -94,15 +99,16 @@ export default function Home() {
                     <CardDescription>Select a set of locations to play with.</CardDescription>
                 </CardHeader>
                 <CardContent className="grid grid-cols-2 gap-4">
-                    <Button onClick={() => handleSetGameMode('USA')} size="lg">USA</Button>
-                    <Button onClick={() => handleSetGameMode('EU')} size="lg">Europe</Button>
-                    <Button onClick={() => handleSetGameMode('ASIA')} size="lg">Asia</Button>
-                    <Button onClick={() => handleSetGameMode('NEAR_ME')} size="lg" disabled={gameLoading}>
+                    <Button onClick={() => handleSetGameMode('USA')} size="lg" disabled={isMultiplayer && !isHost}>USA</Button>
+                    <Button onClick={() => handleSetGameMode('EU')} size="lg" disabled={isMultiplayer && !isHost}>Europe</Button>
+                    <Button onClick={() => handleSetGameMode('ASIA')} size="lg" disabled={isMultiplayer && !isHost}>Asia</Button>
+                    <Button onClick={() => handleSetGameMode('NEAR_ME')} size="lg" disabled={gameLoading || (isMultiplayer && !isHost)}>
                         { gameLoading ? <Loader2 className="animate-spin" /> : <><Pin /> Near Me</> }
                     </Button>
                 </CardContent>
                  <CardContent>
-                    <Button variant="link" onClick={() => resetGame()}>Back to main menu</Button>
+                    { !isMultiplayer && <Button variant="link" onClick={() => resetGame()}>Back to main menu</Button> }
+                    { isMultiplayer && !isHost && <p className="text-muted-foreground">Waiting for host to select a mode...</p>}
                 </CardContent>
             </Card>
         );
@@ -126,6 +132,7 @@ export default function Home() {
                             step={1}
                             value={[nearMeOptions.radius]}
                             onValueChange={(value) => setNearMeOptions(prev => ({ ...prev, radius: value[0] }))}
+                            disabled={isMultiplayer && !isHost}
                         />
                     </div>
                      <div className="space-y-4">
@@ -140,6 +147,7 @@ export default function Home() {
                             step={1}
                             value={[nearMeOptions.rounds]}
                             onValueChange={(value) => setNearMeOptions(prev => ({ ...prev, rounds: value[0] }))}
+                            disabled={isMultiplayer && !isHost}
                         />
                     </div>
                      <div className="space-y-4">
@@ -154,16 +162,20 @@ export default function Home() {
                                             ...prev,
                                             categories: { ...prev.categories, [key]: checked }
                                         }))}
+                                        disabled={isMultiplayer && !isHost}
                                     />
                                     <Label htmlFor={key} className="capitalize">{key}</Label>
                                 </div>
                             ))}
                         </div>
                     </div>
-                    <Button onClick={handleStartNearMe} className="w-full" disabled={gameLoading}>
-                        { gameLoading ? <Loader2 className="animate-spin"/> : "Start Game" }
-                    </Button>
-                     <Button variant="link" onClick={() => setGameState('mode_selection')}>Back</Button>
+                     { (!isMultiplayer || isHost) && (
+                        <Button onClick={handleStartNearMe} className="w-full" disabled={gameLoading}>
+                            { gameLoading ? <Loader2 className="animate-spin"/> : "Start Game" }
+                        </Button>
+                     )}
+                     <Button variant="link" onClick={() => setGameState('mode_selection')} disabled={isMultiplayer && !isHost}>Back</Button>
+                     { isMultiplayer && !isHost && <p className="text-muted-foreground">Waiting for host to start the game...</p>}
                 </CardContent>
             </Card>
         )
@@ -180,7 +192,7 @@ export default function Home() {
           <div className="flex flex-col items-center gap-6 w-full max-w-md">
             <div className="w-full flex justify-between items-center text-lg font-semibold">
                 <span>Round: {currentRound}/{totalRounds}</span>
-                <span>Score: {score}</span>
+                 <span>Score: {score}</span>
             </div>
              <div className="w-full space-y-2">
                 <Progress value={(timeLeft / 15) * 100} className="h-2" />
@@ -270,4 +282,12 @@ export default function Home() {
   );
 }
 
+
+export default function Home() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <HomeComponent />
+    </Suspense>
+  )
+}
     

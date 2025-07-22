@@ -44,7 +44,7 @@ export default function LobbyPage() {
 
     useEffect(() => {
         if (lobby?.status === 'playing') {
-            router.push(`/game/${lobbyId}`);
+            router.push(`/?lobbyId=${lobbyId}`);
         }
     }, [lobby, lobbyId, router]);
 
@@ -109,7 +109,7 @@ export default function LobbyPage() {
                             </div>
                         </div>
 
-                        {isHost && <Button onClick={startGame} disabled={lobbyLoading || lobby.players.length < 2}>Start Game</Button>}
+                        {isHost && <Button onClick={startGame} disabled={lobbyLoading || lobby.players.length < 1}>Start Game</Button>}
                         <Button variant="ghost" onClick={() => {
                             leaveLobby();
                             router.push('/');

@@ -5,8 +5,9 @@ import { useState, useEffect, useCallback } from 'react';
 import { doc, getDoc, setDoc, onSnapshot, updateDoc, arrayUnion, arrayRemove, deleteDoc, collection, serverTimestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { User } from 'firebase/auth';
+import type { Location } from '@/lib/locations';
 
-interface Player {
+export interface Player {
     uid: string;
     displayName: string | null;
     photoURL: string | null;
@@ -14,17 +15,19 @@ interface Player {
     guesses: (number | null)[];
 }
 
-interface Lobby {
+export interface Lobby {
     id: string;
     hostId: string;
     players: Player[];
     status: 'waiting' | 'playing' | 'finished';
     createdAt: any;
-    gameMode: string | null;
+    gameMode: GameMode | null;
     currentRound: number;
-    locations: any[]; // Replace with actual location type
+    locations: Location[];
     maxPlayers: number;
 }
+
+type GameMode = "USA" | "EU" | "ASIA" | "WORLD" | "NEAR_ME";
 
 function generateLobbyCode(): string {
     const code = Math.floor(100000 + Math.random() * 900000).toString();
@@ -118,6 +121,9 @@ export function useLobby(user: User | null) {
             if (currentLobby.players.length >= currentLobby.maxPlayers) {
                 throw new Error("Lobby is full.");
             }
+             if (currentLobby.status !== 'waiting') {
+                throw new Error("Game has already started.");
+            }
             if(currentLobby.players.find(p => p.uid === user.uid)) {
                 setLobbyId(code); // Already in lobby, just set it
                 return;
@@ -183,10 +189,8 @@ export function useLobby(user: User | null) {
 
          setLoading(true);
          try {
-            // Here you would select a gamemode and locations
             await updateDoc(doc(db, 'lobbies', lobbyId), {
                 status: 'playing',
-                // You would also populate locations here based on a chosen game mode
             });
          } catch(err) {
             console.error(err);
