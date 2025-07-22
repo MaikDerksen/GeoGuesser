@@ -6,6 +6,7 @@ import { useLobby } from '@/hooks/use-lobby';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { InputOTP, InputOTPGroup, InputOTPSlot, InputOTPSeparator } from '@/components/ui/input-otp';
 import { Input } from '@/components/ui/input';
 import { Loader2, Copy, LogOut } from 'lucide-react';
 import { useEffect, useState } from 'react';
@@ -58,18 +59,11 @@ export default function LobbyPage() {
              toast({ title: "Copied!", description: "Lobby code copied to clipboard." });
         }
     }
-
-    const handleJoinCodeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const value = e.target.value.toUpperCase();
-        if (value.length > 7) return;
-
-        if (value.length === 3 && joinCode.length < 3) {
-            setJoinCode(value + '-');
-        } else {
-            setJoinCode(value);
-        }
-    };
-
+    
+    const handleJoinLobby = () => {
+        if(joinCode.length !== 6) return;
+        joinLobby(`${joinCode.substring(0,3)}-${joinCode.substring(3,6)}`);
+    }
 
     if (lobbyId && lobby) {
         const isHost = lobby.hostId === user.uid;
@@ -138,15 +132,24 @@ export default function LobbyPage() {
                             </span>
                         </div>
                     </div>
-                    <div className="grid gap-2">
-                        <Input 
-                            placeholder="Enter code (e.g. ABC-XYZ)" 
-                            value={joinCode} 
-                            onChange={handleJoinCodeChange}
-                            maxLength={7}
-                            className="text-center tracking-widest"
-                        />
-                        <Button onClick={() => joinLobby(joinCode)} disabled={lobbyLoading || joinCode.length !== 7}>
+                    <div className="grid gap-4 justify-items-center">
+                        <div className="text-center">
+                            <p className="text-sm text-muted-foreground">Enter code to join a lobby</p>
+                        </div>
+                        <InputOTP maxLength={6} value={joinCode} onChange={setJoinCode} pattern="[0-9]*">
+                            <InputOTPGroup>
+                                <InputOTPSlot index={0} />
+                                <InputOTPSlot index={1} />
+                                <InputOTPSlot index={2} />
+                            </InputOTPGroup>
+                            <InputOTPSeparator />
+                            <InputOTPGroup>
+                                <InputOTPSlot index={3} />
+                                <InputOTPSlot index={4} />
+                                <InputOTPSlot index={5} />
+                            </InputOTPGroup>
+                        </InputOTP>
+                        <Button onClick={handleJoinLobby} disabled={lobbyLoading || joinCode.length !== 6}>
                              {lobbyLoading ? <Loader2 className="animate-spin"/> : 'Join Lobby'}
                         </Button>
                     </div>

@@ -27,7 +27,7 @@ interface Lobby {
 }
 
 function generateLobbyCode(): string {
-    const code = Math.random().toString(36).substring(2, 8).toUpperCase();
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
     return `${code.substring(0,3)}-${code.substring(3,6)}`;
 }
 
