@@ -9,8 +9,11 @@ import { useDeviceOrientation } from '@/hooks/use-device-orientation';
 import type { Location } from '@/lib/locations';
 import { locations } from '@/lib/locations';
 import { calculateBearing } from '@/lib/geo';
-import { Loader2, Compass as CompassIcon } from 'lucide-react';
+import { Loader2, Compass as CompassIcon, QrCode } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
+import QRCode from "qrcode.react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+
 
 type GameState = 'idle' | 'permission' | 'loading_location' | 'playing' | 'results';
 
@@ -18,10 +21,17 @@ export default function Home() {
   const [gameState, setGameState] = useState<GameState>('idle');
   const [target, setTarget] = useState<Location | null>(null);
   const [userGuess, setUserGuess] = useState<number | null>(null);
+  const [appUrl, setAppUrl] = useState('');
   const { toast } = useToast();
 
   const { data: userLocation, loading: locationLoading, error: locationError, getLocation } = useGeolocation();
   const { orientation, error: orientationError, requestPermission, permissionState } = useDeviceOrientation();
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setAppUrl(window.location.origin);
+    }
+  }, []);
 
   const heading = useMemo(() => {
     if (!orientation) return 0;
@@ -159,6 +169,25 @@ export default function Home() {
       <div className="container mx-auto flex items-center justify-center">
         {renderContent()}
       </div>
+       {appUrl && (
+        <div className="absolute bottom-4 right-4">
+          <Dialog>
+            <DialogTrigger asChild>
+              <Button variant="ghost" size="icon">
+                <QrCode className="h-6 w-6" />
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-md">
+              <DialogHeader>
+                <DialogTitle>Scan to play on your phone</DialogTitle>
+              </DialogHeader>
+              <div className="flex items-center justify-center p-4">
+                <QRCode value={appUrl} size={256} />
+              </div>
+            </DialogContent>
+          </Dialog>
+        </div>
+      )}
     </main>
   );
 }
