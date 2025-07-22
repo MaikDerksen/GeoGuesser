@@ -8,6 +8,8 @@ import { useGeolocation } from '@/hooks/use-geolocation';
 import { useDeviceOrientation } from '@/hooks/use-device-orientation';
 import { calculateBearing } from '@/lib/geo';
 import { useToast } from "@/hooks/use-toast";
+import type { User } from 'firebase/auth';
+
 
 type GameState = 'idle' | 'mode_selection' | 'permission' | 'loading_location' | 'playing' | 'results';
 type GameMode = keyof typeof locationPacks;
@@ -15,7 +17,7 @@ type GameMode = keyof typeof locationPacks;
 const TOTAL_ROUNDS = 7;
 const ROUND_TIMER = 15;
 
-export function useGameState() {
+export function useGameState(user: User | null) {
   const [gameState, setGameState] = useState<GameState>('idle');
   const [gameMode, setGameMode] = useState<GameMode | null>(null);
   const [score, setScore] = useState(0);
@@ -57,7 +59,7 @@ export function useGameState() {
       target.coordinates.longitude
     );
   }, [userLocation, target]);
-
+  
   const handleGuess = useCallback((angle: number) => {
     if (gameState !== 'playing') return;
     setUserGuess(angle);
@@ -87,6 +89,19 @@ export function useGameState() {
     return () => clearInterval(timer);
   }, [gameState, timeLeft, heading, handleGuess]);
 
+  const startNewRound = useCallback(() => {
+    setGameState('loading_location');
+    setUserGuess(null);
+    
+    if (gameMode) {
+      const locations = locationPacks[gameMode];
+      const randomLocation = locations[Math.floor(Math.random() * locations.length)];
+      setTarget(randomLocation);
+    }
+    
+    getLocation();
+  }, [gameMode, getLocation]);
+
   const handleSetGameMode = useCallback((mode: GameMode) => {
     setGameMode(mode);
     setCurrentRound(0);
@@ -99,7 +114,7 @@ export function useGameState() {
       toast({ title: "Permission Required", description: "Device orientation permission is required to play. Please enable it in your browser settings.", variant: "destructive"});
       setGameState('idle');
     }
-  }, [permissionState, toast]);
+  }, [permissionState, toast, startNewRound]);
 
 
   // Handle starting the game or next round
@@ -114,7 +129,7 @@ export function useGameState() {
             startNewRound();
        }
     }
-  }, [gameState, currentRound]);
+  }, [gameState, currentRound, startNewRound]);
 
   const handleGrantPermission = async () => {
     const status = await requestPermission();
@@ -126,19 +141,6 @@ export function useGameState() {
         toast({ title: "Permission Denied", description: "Permission for device orientation was denied. The game cannot start.", variant: "destructive"});
     }
   }
-  
-  const startNewRound = useCallback(() => {
-    setGameState('loading_location');
-    setUserGuess(null);
-    
-    if (gameMode) {
-      const locations = locationPacks[gameMode];
-      const randomLocation = locations[Math.floor(Math.random() * locations.length)];
-      setTarget(randomLocation);
-    }
-    
-    getLocation();
-  }, [gameMode, getLocation]);
 
   // Effect to transition from loading to playing
   useEffect(() => {
@@ -155,6 +157,15 @@ export function useGameState() {
     }
   }, [gameState, locationLoading, userLocation, locationError, toast]);
 
+  // Reset to idle if user logs out
+  useEffect(() => {
+    if (!user) {
+      setGameState('idle');
+      setGameMode(null);
+      setCurrentRound(0);
+      setScore(0);
+    }
+  }, [user]);
 
   return {
     gameState,

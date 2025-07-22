@@ -5,14 +5,19 @@ import { useMemo } from 'react';
 import Compass from '@/components/compass';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Loader2, Compass as CompassIcon, QrCode } from 'lucide-react';
+import { Loader2, Compass as CompassIcon, QrCode, LogOut } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import QRCode from "qrcode.react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useGameState } from '@/hooks/use-game-state';
 import { Progress } from '@/components/ui/progress';
+import { useAuth } from '@/hooks/use-auth';
+import { useRouter } from 'next/navigation';
 
 export default function Home() {
+  const { user, loading: authLoading, signOut } = useAuth();
+  const router = useRouter();
+  
   const {
     gameState,
     score,
@@ -29,10 +34,24 @@ export default function Home() {
     handleGuess,
     handleGrantPermission,
     permissionState
-  } = useGameState();
-
+  } = useGameState(user);
 
   const renderContent = () => {
+    if (authLoading) {
+      return (
+        <div className="flex flex-col items-center gap-4 text-center">
+            <Loader2 className="h-12 w-12 animate-spin text-primary" />
+            <p className="text-lg text-muted-foreground">Authenticating...</p>
+        </div>
+      );
+    }
+    
+    if (!user) {
+       router.push('/login');
+       return null;
+    }
+
+
     switch (gameState) {
       case 'permission':
         return (
@@ -122,8 +141,8 @@ export default function Home() {
               <CardDescription>Guess the direction of famous landmarks!</CardDescription>
             </CardHeader>
             <CardContent className="flex flex-col gap-4">
-              <Button onClick={handleStart} size="lg">Single Player</Button>
-              <Button variant="secondary" size="lg" disabled>Multiplayer</Button>
+              <p className="text-muted-foreground">Welcome, {user.displayName || user.email}!</p>
+              <Button onClick={handleStart} size="lg">Start Game</Button>
             </CardContent>
           </Card>
         );
@@ -135,6 +154,13 @@ export default function Home() {
       <div className="container mx-auto flex items-center justify-center">
         {renderContent()}
       </div>
+      {user && (
+         <div className="absolute top-4 right-4">
+          <Button variant="ghost" size="icon" onClick={signOut} aria-label="Sign out">
+            <LogOut className="h-6 w-6" />
+          </Button>
+        </div>
+      )}
        {appUrl && (
         <div className="absolute bottom-4 right-4">
           <Dialog>
