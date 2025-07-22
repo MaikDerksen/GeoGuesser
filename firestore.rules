@@ -3,50 +3,59 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    // Helper functions
     function isSignedIn() {
       return request.auth != null;
     }
 
-    function isPlayerInLobby(lobbyData) {
-      return request.auth.uid in lobbyData.players;
+    // Helper functions to find the index of the authenticated user in the players list
+    function getPlayerIndex(resource) {
+      // The .get() method with a default value of -1 is a safe way to check for presence.
+      return resource.data.players.map(p => p.uid).indexOf(request.auth.uid);
     }
 
-    function isHost(lobbyData) {
-      return request.auth.uid == lobbyData.hostId;
+    function getIncomingPlayerIndex(request) {
+      return request.resource.data.players.map(p => p.uid).indexOf(request.auth.uid);
     }
 
-    // Rules for lobbies collection
     match /lobbies/{lobbyId} {
-      allow read;
+      allow read: if true;
       
-      allow create: if isSignedIn();
-      
-      allow update: if 
-        // Ensure user is signed in and part of the lobby
-        isSignedIn() && isPlayerInLobby(resource.data) &&
-        (
-          // CASE 1: The user is the host
-          isHost(resource.data) ||
-          // CASE 2: The user is a player updating only their own data
-          (
-            // Check that the incoming write request only modifies the 'players' field
-            request.resource.data.diff(resource.data).affectedKeys()
-                .hasOnly(['players']) &&
-            // Check that the list of player UIDs hasn't changed
-            request.resource.data.players.keys() == resource.data.players.keys() &&
-            // Check that the current player is only modifying their own map entry
-            request.resource.data.players[request.auth.uid].diff(resource.data.players[request.auth.uid])
-                .affectedKeys().hasOnly(['score', 'guesses'])
-          )
-        );
+      allow create: if isSignedIn() && 
+                    request.resource.data.hostId == request.auth.uid &&
+                    request.resource.data.players[0].uid == request.auth.uid;
 
-      allow delete: if isHost(resource.data);
-    }
-    
-    // Disallow reads/writes to the players subcollection directly for now
-    match /lobbies/{lobbyId}/players/{playerId} {
-      allow read, write: if false;
+      allow update: if isSignedIn() &&
+                    // Either the user is joining a waiting lobby for the first time
+                    (
+                      getPlayerIndex(resource) == -1 &&
+                      getIncomingPlayerIndex(request) != -1 &&
+                      resource.data.status == 'waiting' &&
+                      request.resource.data.players.size() == resource.data.players.size() + 1 &&
+                      request.resource.data.players[getIncomingPlayerIndex(request)].uid == request.auth.uid
+                    ) ||
+                    // Or the user is already in the lobby and making valid game moves
+                    (
+                      getPlayerIndex(resource) != -1 &&
+                      // The player list size cannot change, except for the host removing players
+                      (request.resource.data.players.size() == resource.data.players.size() || request.auth.uid == resource.data.hostId) &&
+                      // A player can only update their own score and guesses
+                      (
+                        request.resource.data.players[getPlayerIndex(resource)].score >= resource.data.players[getPlayerIndex(resource)].score &&
+                        request.resource.data.players[getPlayerIndex(resource)].guesses.size() >= resource.data.players[getPlayerIndex(resource)].guesses.size()
+                      ) &&
+                      // The host is allowed to change the game state
+                      (
+                        request.auth.uid == resource.data.hostId ||
+                        (
+                          request.resource.data.status == resource.data.status &&
+                          request.resource.data.currentRound == resource.data.currentRound &&
+                          request.resource.data.locations == resource.data.locations &&
+                          request.resource.data.gameMode == resource.data.gameMode
+                        )
+                      )
+                    );
+
+      allow delete: if isSignedIn() && request.auth.uid == resource.data.hostId;
     }
   }
 }
