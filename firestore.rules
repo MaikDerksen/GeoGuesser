@@ -1,27 +1,61 @@
-
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
+
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isPlayerInLobby(lobbyId) {
+      return isSignedIn() && get(/databases/$(database)/documents/lobbies/$(lobbyId)).data.players.exists(p, p.uid == request.auth.uid);
+    }
     
-    // Lobbies
+    function isHost(lobby) {
+      return isSignedIn() && request.auth.uid == lobby.hostId;
+    }
+
     match /lobbies/{lobbyId} {
-      
-      // Anyone authenticated can read lobby data
-      allow read: if request.auth != null;
-      
-      // Anyone authenticated can create a lobby
-      allow create: if request.auth != null;
+      // ANY authenticated user can create a lobby.
+      allow create: if isSignedIn();
 
-      // Host can update anything, players can only update the players list to join/leave.
-      allow update: if request.auth != null &&
-                      (request.auth.uid == resource.data.hostId ||
-                       (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['players']) &&
-                        (request.resource.data.players.size() == resource.data.players.size() + 1 ||
-                         request.resource.data.players.size() == resource.data.players.size() - 1)));
+      // ANY player in the lobby can read its data.
+      allow get: if isPlayerInLobby(lobbyId);
 
-      // Allow host to delete the lobby
-      allow delete: if request.auth.uid == resource.data.hostId;
+      // Host can delete the lobby.
+      allow delete: if isHost(resource.data);
+
+      // Update permissions
+      allow update: if 
+        // The user must be a player in the lobby to update anything.
+        isPlayerInLobby(lobbyId) &&
+        (
+          // HOST ONLY actions:
+          // The host can change gameMode, locations, currentRound, and status.
+          (isHost(resource.data) &&
+            (request.resource.data.diff(resource.data).affectedKeys()
+              .hasOnly(['gameMode', 'locations', 'currentRound', 'status']))
+          ) ||
+          
+          // PLAYER actions (including host):
+          // Any player can join (add themselves to players array).
+          (request.resource.data.players.size() == resource.data.players.size() + 1 &&
+            request.auth.uid == request.resource.data.players[resource.data.players.size()].uid
+          ) ||
+          
+          // Any player can leave (remove themselves from players array).
+          (request.resource.data.players.size() == resource.data.players.size() - 1 &&
+            !isPlayerInLobby(request.resource.data.id) // check that they are the one who left
+          ) ||
+
+          // Any player can update their own score and guesses.
+          // This is the key change to fix the permission error.
+          (request.resource.data.players.size() == resource.data.players.size() &&
+            request.resource.data.players.diff(resource.data.players).affectedKeys()
+              .hasOnly(request.resource.data.players.filter(p, p.uid == request.auth.uid).keys())
+          )
+        );
     }
   }
 }
