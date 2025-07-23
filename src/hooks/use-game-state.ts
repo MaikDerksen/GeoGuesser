@@ -122,7 +122,7 @@ export function useGameState(user: User | null, lobbyId: string | null = null) {
         return nearMeOptions.rounds;
     }
     const selectedMode = gameModes.find(m => m.id === gameMode);
-    return selectedMode?.locations.length || 7;
+    return selectedMode?.locations?.length || 7;
   }, [gameMode, nearMeOptions.rounds, gameModes]);
 
   // Set App URL for QR Code
@@ -419,5 +419,7 @@ export function useGameState(user: User | null, lobbyId: string | null = null) {
     lobby,
   };
 }
+
+    
 
     
