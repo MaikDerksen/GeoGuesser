@@ -128,7 +128,77 @@ export async function seedDatabase(): Promise<void> {
                 { name: 'Colosseum', coordinates: { latitude: 41.8902, longitude: 12.4922 } },
                 { name: 'Christ the Redeemer', coordinates: { latitude: -22.9519, longitude: -43.2105 } }
             ]
-        }
+        },
+        {
+            id: 'EUROPE',
+            name: 'Europe',
+            locations: [
+                { name: 'Big Ben', coordinates: { latitude: 51.5007, longitude: -0.1246 } },
+                { name: 'Brandenburg Gate', coordinates: { latitude: 52.5163, longitude: 13.3777 } },
+                { name: 'Acropolis of Athens', coordinates: { latitude: 37.9715, longitude: 23.7257 } },
+                { name: 'Neuschwanstein Castle', coordinates: { latitude: 47.5576, longitude: 10.7498 } },
+            ]
+        },
+        {
+            id: 'ASIA',
+            name: 'Asia',
+            locations: [
+                { name: 'Mount Fuji', coordinates: { latitude: 35.3606, longitude: 138.7274 } },
+                { name: 'Angkor Wat', coordinates: { latitude: 13.4125, longitude: 103.8667 } },
+                { name: 'Petronas Towers', coordinates: { latitude: 3.1579, longitude: 101.7123 } },
+                { name: 'Forbidden City', coordinates: { latitude: 39.9163, longitude: 116.3972 } },
+            ]
+        },
+        {
+            id: 'AFRICA',
+            name: 'Africa',
+            locations: [
+                { name: 'Pyramids of Giza', coordinates: { latitude: 29.9792, longitude: 31.1342 } },
+                { name: 'Victoria Falls', coordinates: { latitude: -17.9243, longitude: 25.8572 } },
+                { name: 'Mount Kilimanjaro', coordinates: { latitude: -3.0674, longitude: 37.3556 } },
+                { name: 'Table Mountain', coordinates: { latitude: -33.9626, longitude: 18.4098 } },
+            ]
+        },
+        {
+            id: 'LATIN_AMERICA',
+            name: 'Latin America',
+            locations: [
+                { name: 'Chichen Itza', coordinates: { latitude: 20.6843, longitude: -88.5678 } },
+                { name: 'Angel Falls', coordinates: { latitude: 5.9689, longitude: -62.5358 } },
+                { name: 'Torres del Paine', coordinates: { latitude: -50.9423, longitude: -72.9866 } },
+                { name: 'Galapagos Islands', coordinates: { latitude: -0.3371, longitude: -90.9661 } },
+            ]
+        },
+        {
+            id: 'MIDDLE_EAST',
+            name: 'Middle East',
+            locations: [
+                { name: 'Burj Khalifa', coordinates: { latitude: 25.1972, longitude: 55.2744 } },
+                { name: 'Hagia Sophia', coordinates: { latitude: 41.0086, longitude: 28.9802 } },
+                { name: 'Western Wall', coordinates: { latitude: 31.7767, longitude: 35.2345 } },
+                { name: 'The Kaaba', coordinates: { latitude: 21.4225, longitude: 39.8262 } },
+            ]
+        },
+        {
+            id: 'OCEANIA',
+            name: 'Oceania',
+            locations: [
+                { name: 'Sydney Opera House', coordinates: { latitude: -33.8568, longitude: 151.2153 } },
+                { name: 'Uluru', coordinates: { latitude: -25.3444, longitude: 131.0369 } },
+                { name: 'Milford Sound', coordinates: { latitude: -44.6720, longitude: 167.9242 } },
+                { name: 'Bora Bora', coordinates: { latitude: -16.5004, longitude: -151.7415 } },
+            ]
+        },
+        {
+            id: 'ARCTIC_ANTARCTIC',
+            name: 'Arctic/Antarctic',
+            locations: [
+                { name: 'McMurdo Station', coordinates: { latitude: -77.8463, longitude: 166.6682 } },
+                { name: 'South Pole Telescope', coordinates: { latitude: -89.9911, longitude: -45.0000 } },
+                { name: 'Svalbard Global Seed Vault', coordinates: { latitude: 78.2356, longitude: 15.4913 } },
+                { name: 'Alert, Nunavut', coordinates: { latitude: 82.5018, longitude: -62.3481 } },
+            ]
+        },
     ];
 
     const batch = writeBatch(db);
