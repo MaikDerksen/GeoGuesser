@@ -91,9 +91,9 @@ const getNearbyLocationsFlow = ai.defineFlow(
     },
     async (input) => {
         // 1. Call Google Places API
-        const apiKey = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
+        const apiKey = process.env.GOOGLE_PLACES_KEY;
         if (!apiKey) {
-            throw new Error("Google API key is missing.");
+            throw new Error("Google Places API key is missing. Please set GOOGLE_PLACES_KEY in your .env.local file.");
         }
 
         const placesResponse = await fetch('https://places.googleapis.com/v1/places:searchNearby', {
