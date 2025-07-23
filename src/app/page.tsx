@@ -16,6 +16,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
+import type { GameMode } from '@/lib/game-data';
 
 
 function HomeComponent() {
@@ -37,6 +38,7 @@ function HomeComponent() {
     userGuess,
     appUrl,
     gameMode,
+    gameModes,
     handleSetGameMode,
     handleStart,
     handleGuess,
@@ -99,9 +101,9 @@ function HomeComponent() {
                     <CardDescription>Select a set of locations to play with.</CardDescription>
                 </CardHeader>
                 <CardContent className="grid grid-cols-2 gap-4">
-                    <Button onClick={() => handleSetGameMode('USA')} size="lg" disabled={isMultiplayer && !isHost}>USA</Button>
-                    <Button onClick={() => handleSetGameMode('EU')} size="lg" disabled={isMultiplayer && !isHost}>Europe</Button>
-                    <Button onClick={() => handleSetGameMode('ASIA')} size="lg" disabled={isMultiplayer && !isHost}>Asia</Button>
+                    {gameModes.map((mode: GameMode) => (
+                        <Button key={mode.id} onClick={() => handleSetGameMode(mode.id)} size="lg" disabled={isMultiplayer && !isHost}>{mode.name}</Button>
+                    ))}
                     <Button onClick={() => handleSetGameMode('NEAR_ME')} size="lg" disabled={gameLoading || (isMultiplayer && !isHost)}>
                         { gameLoading ? <Loader2 className="animate-spin" /> : <><Pin /> Near Me</> }
                     </Button>

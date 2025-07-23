@@ -2,10 +2,10 @@
 "use client";
 
 import { useState, useEffect, useCallback } from 'react';
-import { doc, getDoc, setDoc, onSnapshot, updateDoc, arrayUnion, arrayRemove, deleteDoc, collection, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, setDoc, onSnapshot, updateDoc, arrayUnion, arrayRemove, deleteDoc, collection, serverTimestamp, writeBatch } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { User } from 'firebase/auth';
-import type { Location } from '@/lib/locations';
+import type { Location } from '@/lib/game-data';
 
 export interface Player {
     uid: string;
@@ -21,7 +21,7 @@ export interface Lobby {
     players: Player[];
     status: 'waiting' | 'playing' | 'finished';
     createdAt: any;
-    gameMode: GameMode | null;
+    gameMode: string | null;
     currentRound: number;
     locations: Location[];
     maxPlayers: number;
@@ -29,9 +29,20 @@ export interface Lobby {
 
 type GameMode = "USA" | "EU" | "ASIA" | "WORLD" | "NEAR_ME";
 
-function generateLobbyCode(): string {
-    const code = Math.floor(100000 + Math.random() * 900000).toString();
-    return `${code.substring(0,3)}-${code.substring(3,6)}`;
+async function generateLobbyCode(): Promise<string> {
+    const lobbiesRef = collection(db, 'lobbies');
+    let newCode;
+    let codeExists = true;
+    
+    while(codeExists) {
+        const code = Math.floor(100000 + Math.random() * 900000).toString();
+        newCode = `${code.substring(0,3)}-${code.substring(3,6)}`;
+        
+        const docRef = doc(lobbiesRef, newCode);
+        const docSnap = await getDoc(docRef);
+        codeExists = docSnap.exists();
+    }
+    return newCode;
 }
 
 
@@ -42,14 +53,17 @@ export function useLobby(user: User | null) {
     const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
-        if (!lobbyId) return;
+        if (!lobbyId) {
+            setLobby(null);
+            return;
+        };
 
         setLoading(true);
         const unsubscribe = onSnapshot(doc(db, 'lobbies', lobbyId), (doc) => {
             if (doc.exists()) {
                 setLobby(doc.data() as Lobby);
             } else {
-                setError("Lobby not found.");
+                setError("Lobby not found or has been closed.");
                 setLobby(null);
                 setLobbyId(null);
             }
@@ -72,7 +86,7 @@ export function useLobby(user: User | null) {
         setLoading(true);
         setError(null);
         
-        const newLobbyId = generateLobbyCode();
+        const newLobbyId = await generateLobbyCode();
         const newPlayer: Player = {
             uid: user.uid,
             displayName: user.displayName,
@@ -152,24 +166,23 @@ export function useLobby(user: User | null) {
         if (!user || !lobbyId) return;
         
         const lobbyRef = doc(db, 'lobbies', lobbyId);
+        setLobbyId(null);
+        setLobby(null);
+        
         try {
             const lobbySnap = await getDoc(lobbyRef);
             if (lobbySnap.exists()) {
                 const currentLobby = lobbySnap.data() as Lobby;
                 const playerToRemove = currentLobby.players.find(p => p.uid === user.uid);
 
-                if (currentLobby.hostId === user.uid && currentLobby.players.length > 1) {
-                    // Host is leaving, assign a new host
-                    const newHost = currentLobby.players.find(p => p.uid !== user.uid);
-                    if (newHost) {
-                        await updateDoc(lobbyRef, {
-                            hostId: newHost.uid,
-                            players: arrayRemove(playerToRemove)
-                        });
-                    }
-                } else if (currentLobby.players.length === 1) {
-                    // Last player is leaving, delete the lobby
+                if (currentLobby.players.length <= 1) {
                     await deleteDoc(lobbyRef);
+                } else if (currentLobby.hostId === user.uid) {
+                    const newHost = currentLobby.players.find(p => p.uid !== user.uid);
+                    await updateDoc(lobbyRef, {
+                        hostId: newHost!.uid,
+                        players: arrayRemove(playerToRemove)
+                    });
                 } else {
                     await updateDoc(lobbyRef, {
                         players: arrayRemove(playerToRemove)
@@ -180,8 +193,6 @@ export function useLobby(user: User | null) {
             console.error(err);
             setError("Failed to leave lobby.");
         }
-        setLobbyId(null);
-        setLobby(null);
     }, [user, lobbyId]);
 
     const startGame = useCallback(async () => {
