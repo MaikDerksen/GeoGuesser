@@ -1,6 +1,9 @@
 import type {Metadata} from 'next';
 import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
+import { cn } from '@/lib/utils';
+import Link from 'next/link';
+import { Button } from '@/components/ui/button';
 
 export const metadata: Metadata = {
   title: 'GeoCompass',
@@ -20,6 +23,10 @@ export default function RootLayout({
         <link href="https://fonts.googleapis.com/css2?family=Inter&display=swap" rel="stylesheet" />
       </head>
       <body className="font-body antialiased">
+        <header className="absolute top-0 left-0 p-4">
+            <Button asChild variant="link"><Link href="/">Home</Link></Button>
+            {process.env.NEXT_PUBLIC_ADMIN_UID && <Button asChild variant="link"><Link href="/admin">Admin</Link></Button>}
+        </header>
         {children}
         <Toaster />
       </body>
