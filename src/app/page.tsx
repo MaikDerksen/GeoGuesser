@@ -166,7 +166,7 @@ function HomeComponent() {
                                         }))}
                                         disabled={isMultiplayer && !isHost}
                                     />
-                                    <Label htmlFor={key} className="capitalize">{key}</Label>
+                                    <Label htmlFor={key} className="capitalize">{key.replace(/_/g, " ")}</Label>
                                 </div>
                             ))}
                         </div>

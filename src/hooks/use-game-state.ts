@@ -22,12 +22,12 @@ interface NearMeOptions {
     radius: number;
     rounds: number;
     categories: {
-        restaurants: boolean;
-        culture: boolean;
-        shopping: boolean;
-        hotels: boolean;
-        infrastructure: boolean;
-        landmarks: boolean;
+        restaurant: boolean;
+        tourist_attraction: boolean;
+        store: boolean;
+        hotel: boolean;
+        airport: boolean;
+        park: boolean;
     }
 }
 
@@ -61,12 +61,12 @@ export function useGameState(user: User | null, lobbyId: string | null = null) {
       radius: 10,
       rounds: 7,
       categories: {
-          restaurants: true,
-          culture: true,
-          shopping: true,
-          hotels: false,
-          infrastructure: false,
-          landmarks: true,
+          restaurant: true,
+          tourist_attraction: true,
+          store: true,
+          hotel: false,
+          airport: false,
+          park: true,
       }
   });
 
@@ -272,7 +272,7 @@ export function useGameState(user: User | null, lobbyId: string | null = null) {
             if (gameMode === 'NEAR_ME') {
                 const selectedCategories = Object.entries(nearMeOptions.categories)
                     .filter(([, value]) => value)
-                    .map(([key]) => key);
+                    .map(([key]) => key.replace(/_/g, " "));
 
                 if (selectedCategories.length === 0) {
                     toast({ title: "No Categories", description: "Please select at least one category for 'Near Me' mode.", variant: "destructive" });
@@ -286,11 +286,12 @@ export function useGameState(user: User | null, lobbyId: string | null = null) {
                     longitude: userLocation.longitude,
                     radius: nearMeOptions.radius,
                     categories: selectedCategories,
+                    count: nearMeOptions.rounds,
                 };
 
-                const aiLocations = await getNearbyLocations(nearMeRequest);
+                const { curatedLocations, rawApiResponse } = await getNearbyLocations(nearMeRequest);
 
-                const uniqueLocations = aiLocations.filter((location, index, self) =>
+                const uniqueLocations = curatedLocations.filter((location, index, self) =>
                     index === self.findIndex((l) => (
                         l.name === location.name
                     ))
@@ -305,14 +306,13 @@ export function useGameState(user: User | null, lobbyId: string | null = null) {
                     return;
                 }
 
-                // Log "Near Me" game data
                 try {
                      await saveNearMeGameData({
                         userId: user.uid,
                         userLocation: {latitude: userLocation.latitude, longitude: userLocation.longitude },
                         nearMeOptions,
                         request: nearMeRequest,
-                        rawResponse: aiLocations,
+                        rawResponse: rawApiResponse,
                         finalLocations: locations,
                      })
                 } catch(e) {

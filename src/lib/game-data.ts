@@ -25,8 +25,8 @@ export interface NearMeGameLog {
         longitude: number;
     };
     nearMeOptions: any;
-    request: any; // The full request sent to the AI
-    rawResponse: Location[];
+    request: any; // The full request sent to the AI/Places API
+    rawResponse: any; // Raw response from the Places API
     finalLocations: Location[];
 }
 
@@ -124,16 +124,14 @@ export async function saveNearMeGameData(data: Omit<NearMeGameLog, 'gameId' | 'c
         createdAt: serverTimestamp(),
     };
     
-    // Path: game_modes/NEAR_ME/logs/{gameId}
     const docRef = doc(db, `game_modes/NEAR_ME/logs/${data.userId}_${gameId}`);
     await setDoc(docRef, logData);
 }
 
 // Database Seeding Function
 export async function seedDatabase(): Promise<void> {
-    const sampleGameModes: GameMode[] = [
+    const sampleGameModes: Omit<GameMode, 'id'>[] = [
         {
-            id: 'USA',
             name: 'USA Landmarks',
             locations: [
                 { name: 'Statue of Liberty', coordinates: { latitude: 40.6892, longitude: -74.0445 } },
@@ -144,7 +142,6 @@ export async function seedDatabase(): Promise<void> {
             ]
         },
         {
-            id: 'WORLD',
             name: 'World Wonders',
             locations: [
                 { name: 'Great Wall of China', coordinates: { latitude: 40.4319, longitude: 116.5704 } },
@@ -157,7 +154,6 @@ export async function seedDatabase(): Promise<void> {
             ]
         },
         {
-            id: 'EUROPE',
             name: 'Europe',
             locations: [
                 { name: 'Big Ben', coordinates: { latitude: 51.5007, longitude: -0.1246 } },
@@ -167,7 +163,6 @@ export async function seedDatabase(): Promise<void> {
             ]
         },
         {
-            id: 'ASIA',
             name: 'Asia',
             locations: [
                 { name: 'Mount Fuji', coordinates: { latitude: 35.3606, longitude: 138.7274 } },
@@ -177,7 +172,6 @@ export async function seedDatabase(): Promise<void> {
             ]
         },
         {
-            id: 'AFRICA',
             name: 'Africa',
             locations: [
                 { name: 'Pyramids of Giza', coordinates: { latitude: 29.9792, longitude: 31.1342 } },
@@ -187,7 +181,6 @@ export async function seedDatabase(): Promise<void> {
             ]
         },
         {
-            id: 'LATIN_AMERICA',
             name: 'Latin America',
             locations: [
                 { name: 'Chichen Itza', coordinates: { latitude: 20.6843, longitude: -88.5678 } },
@@ -197,7 +190,6 @@ export async function seedDatabase(): Promise<void> {
             ]
         },
         {
-            id: 'MIDDLE_EAST',
             name: 'Middle East',
             locations: [
                 { name: 'Burj Khalifa', coordinates: { latitude: 25.1972, longitude: 55.2744 } },
@@ -207,7 +199,6 @@ export async function seedDatabase(): Promise<void> {
             ]
         },
         {
-            id: 'OCEANIA',
             name: 'Oceania',
             locations: [
                 { name: 'Sydney Opera House', coordinates: { latitude: -33.8568, longitude: 151.2153 } },
@@ -217,7 +208,6 @@ export async function seedDatabase(): Promise<void> {
             ]
         },
         {
-            id: 'ARCTIC_ANTARCTIC',
             name: 'Arctic/Antarctic',
             locations: [
                 { name: 'McMurdo Station', coordinates: { latitude: -77.8463, longitude: 166.6682 } },
@@ -229,11 +219,14 @@ export async function seedDatabase(): Promise<void> {
     ];
 
     const batch = writeBatch(db);
+    const existingModes = await getAllGameModes();
+    const existingModeNames = new Set(existingModes.map(m => m.name));
 
     sampleGameModes.forEach(mode => {
-        const docRef = doc(db, 'game_modes', mode.id);
-        // Use setDoc to ensure the document ID is what we specify (e.g., 'USA')
-        batch.set(docRef, { name: mode.name, locations: mode.locations });
+        if (!existingModeNames.has(mode.name)) {
+            const docRef = doc(collection(db, 'game_modes'));
+            batch.set(docRef, mode);
+        }
     });
 
     await batch.commit();
