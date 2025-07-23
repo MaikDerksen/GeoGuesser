@@ -2,8 +2,10 @@
 'use server';
 /**
  * @fileOverview A flow for finding nearby locations for the game.
- * This flow first queries the Google Places API for a list of nearby locations
- * and then uses an AI to curate a final list for the game.
+ * This flow first checks a Firestore cache for existing nearby locations.
+ * If no suitable cache is found, it queries the Google Places API,
+ * stores the results in the cache, and then uses an AI to curate a
+ * final list for the game.
  *
  * - getNearbyLocations - A function that returns a curated list of nearby landmarks.
  * - GetNearbyLocationsInput - The input type for the getNearbyLocations function.
@@ -12,6 +14,9 @@
 
 import { ai } from '@/ai/genkit';
 import { z } from 'zod';
+import { findLocationCache, saveLocationCache } from '@/lib/game-data';
+import type { Location } from '@/lib/game-data';
+
 
 // Define the schema for the raw response from the Google Places API
 const PlaceSchema = z.object({
@@ -90,49 +95,83 @@ const getNearbyLocationsFlow = ai.defineFlow(
         outputSchema: GetNearbyLocationsOutputSchema,
     },
     async (input) => {
-        // 1. Call Google Places API
-        const apiKey = process.env.GOOGLE_PLACES_KEY;
-        if (!apiKey) {
-            throw new Error("Google Places API key is missing. Please set GOOGLE_PLACES_KEY in your .env.local file.");
-        }
+        let placesFromApi: Location[] = [];
+        let rawApiResponse: any = { source: 'cache' };
+        const searchRadiusMeters = input.radius * 1000;
 
-        const placesResponse = await fetch('https://places.googleapis.com/v1/places:searchNearby', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-Goog-Api-Key': apiKey,
-                'X-Goog-FieldMask': 'places.displayName,places.location',
-            },
-            body: JSON.stringify({
-                includedTypes: input.categories,
-                maxResultCount: 20, // Fetch more than needed to allow for curation
-                locationRestriction: {
-                    circle: {
-                        center: {
-                            latitude: input.latitude,
-                            longitude: input.longitude,
-                        },
-                        radius: input.radius * 1000, // Convert km to meters
-                    },
+        // 1. Check for a cached set of locations first
+        const cachedData = await findLocationCache(input.latitude, input.longitude, searchRadiusMeters);
+        
+        if (cachedData && cachedData.locations.length >= input.count) {
+             console.log(`Cache hit! Using ${cachedData.locations.length} locations from cache ID ${cachedData.id}`);
+             placesFromApi = cachedData.locations;
+             rawApiResponse.cacheId = cachedData.id;
+
+        } else {
+             console.log("Cache miss. Calling Google Places API.");
+            // 2. If no cache, call Google Places API
+            const apiKey = process.env.GOOGLE_PLACES_KEY;
+            if (!apiKey) {
+                throw new Error("Google Places API key is missing. Please set GOOGLE_PLACES_KEY in your .env file.");
+            }
+
+            const placesResponse = await fetch('https://places.googleapis.com/v1/places:searchNearby', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Goog-Api-Key': apiKey,
+                    'X-Goog-FieldMask': 'places.displayName,places.location',
                 },
-            }),
-        });
+                body: JSON.stringify({
+                    includedTypes: input.categories,
+                    maxResultCount: 20, // Fetch a good number for the cache and curation
+                    locationRestriction: {
+                        circle: {
+                            center: {
+                                latitude: input.latitude,
+                                longitude: input.longitude,
+                            },
+                            radius: searchRadiusMeters,
+                        },
+                    },
+                }),
+            });
 
-        if (!placesResponse.ok) {
-            const errorBody = await placesResponse.text();
-            throw new Error(`Failed to fetch from Places API: ${placesResponse.statusText} - ${errorBody}`);
-        }
+            if (!placesResponse.ok) {
+                const errorBody = await placesResponse.text();
+                throw new Error(`Failed to fetch from Places API: ${placesResponse.statusText} - ${errorBody}`);
+            }
 
-        const rawApiResponse = await placesResponse.json();
-        const parsedPlaces = PlacesApiResponseSchema.parse(rawApiResponse);
+            rawApiResponse = await placesResponse.json();
+            const parsedPlaces = PlacesApiResponseSchema.parse(rawApiResponse);
 
-        if (!parsedPlaces.places || parsedPlaces.places.length === 0) {
-            return { curatedLocations: [], rawApiResponse };
+            if (!parsedPlaces.places || parsedPlaces.places.length === 0) {
+                return { curatedLocations: [], rawApiResponse };
+            }
+
+            placesFromApi = parsedPlaces.places.map(p => ({
+                name: p.displayName.text,
+                coordinates: {
+                    latitude: p.location.latitude,
+                    longitude: p.location.longitude
+                }
+            }));
+
+            // 3. Save the new results to the cache
+            if(placesFromApi.length > 0) {
+                 const newCacheId = await saveLocationCache({
+                    center: { latitude: input.latitude, longitude: input.longitude },
+                    radius: searchRadiusMeters,
+                    locations: placesFromApi,
+                 });
+                 console.log(`Saved ${placesFromApi.length} locations to new cache ID ${newCacheId}`);
+                 rawApiResponse.newCacheId = newCacheId;
+            }
         }
         
-        // 2. Pass the results to the AI for curation
+        // 4. Pass the results (from cache or API) to the AI for curation
         const aiCurationInput = {
-            places: JSON.stringify(parsedPlaces.places),
+            places: JSON.stringify(placesFromApi),
             count: input.count,
         };
 

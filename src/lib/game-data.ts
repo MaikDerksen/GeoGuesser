@@ -1,6 +1,6 @@
 
 import { db } from './firebase';
-import { collection, getDocs, doc, getDoc, addDoc, updateDoc, deleteDoc, arrayUnion, arrayRemove, writeBatch, setDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, getDocs, doc, getDoc, addDoc, updateDoc, deleteDoc, arrayUnion, arrayRemove, writeBatch, setDoc, serverTimestamp, query, where, limit } from 'firebase/firestore';
 
 export interface Location {
   name: string;
@@ -28,6 +28,17 @@ export interface NearMeGameLog {
     request: any; // The full request sent to the AI/Places API
     rawResponse: any; // Raw response from the Places API
     finalLocations: Location[];
+}
+
+export interface LocationCache {
+    id?: string;
+    center: {
+        latitude: number;
+        longitude: number;
+    };
+    radius: number; // in meters
+    createdAt: any;
+    locations: Location[];
 }
 
 
@@ -119,14 +130,81 @@ export async function deleteLocationFromGameMode(modeId: string, locationIndex: 
 
 export async function saveNearMeGameData(data: Omit<NearMeGameLog, 'gameId' | 'createdAt'>): Promise<void> {
     const gameId = `${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
-    const logData: Omit<NearMeGameLog, 'gameId'> & { createdAt: any } = {
+    const logData: NearMeGameLog = {
         ...data,
+        gameId,
         createdAt: serverTimestamp(),
     };
     
-    const docRef = doc(db, `game_modes/NEAR_ME/logs/${data.userId}_${gameId}`);
+    const docRef = doc(db, `game_modes/NEAR_ME/logs/${logData.gameId}`);
     await setDoc(docRef, logData);
 }
+
+
+export async function findLocationCache(lat: number, lon: number, radius: number): Promise<LocationCache | null> {
+    const cacheRef = collection(db, 'location_cache');
+
+    // Firestore doesn't support native geospatial queries like "is point in circle".
+    // We'll approximate by querying a bounding box and then doing the precise check on the client.
+    const latDegrees = radius / 111320; // ~111.32 km per degree of latitude
+    const lonDegrees = radius / (111320 * Math.cos(lat * (Math.PI / 180)));
+
+    const minLat = lat - latDegrees;
+    const maxLat = lat + latDegrees;
+    const minLon = lon - lonDegrees;
+    const maxLon = lon + lonDegrees;
+
+    const q = query(
+        cacheRef,
+        where('center.latitude', '>=', minLat),
+        where('center.latitude', '<=', maxLat),
+        limit(20) // Limit to reduce client-side processing
+    );
+
+    const snapshot = await getDocs(q);
+    if (snapshot.empty) {
+        return null;
+    }
+
+    const searchPoint = { lat, lon };
+
+    for (const doc of snapshot.docs) {
+        const cache = doc.data() as LocationCache;
+        // Simple longitude check (doesn't cross antimeridian)
+        if (cache.center.longitude >= minLon && cache.center.longitude <= maxLon) {
+             const cachePoint = { lat: cache.center.latitude, lon: cache.center.longitude };
+             // Haversine distance calculation
+            const R = 6371e3; // metres
+            const φ1 = searchPoint.lat * Math.PI/180;
+            const φ2 = cachePoint.lat * Math.PI/180;
+            const Δφ = (cachePoint.lat-searchPoint.lat) * Math.PI/180;
+            const Δλ = (cachePoint.lon-searchPoint.lon) * Math.PI/180;
+
+            const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
+                    Math.cos(φ1) * Math.cos(φ2) *
+                    Math.sin(Δλ/2) * Math.sin(Δλ/2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+            const distance = R * c; // in metres
+
+            if (distance < cache.radius) {
+                return { id: doc.id, ...cache };
+            }
+        }
+    }
+
+    return null;
+}
+
+export async function saveLocationCache(cache: Omit<LocationCache, 'id' | 'createdAt'>): Promise<string> {
+    const cacheRef = collection(db, 'location_cache');
+    const newCache: Omit<LocationCache, 'id'> = {
+        ...cache,
+        createdAt: serverTimestamp(),
+    };
+    const docRef = await addDoc(cacheRef, newCache);
+    return docRef.id;
+}
+
 
 // Database Seeding Function
 export async function seedDatabase(): Promise<void> {
