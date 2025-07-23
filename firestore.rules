@@ -1,58 +1,13 @@
+
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    function isSignedIn() {
-      return request.auth != null;
-    }
-
-    // Return a player map from a list of players, keyed by uid.
-    function playerMap(playerList) {
-      return M.fromList(playerList, (p) => p.uid);
-    }
-
-    match /lobbies/{lobbyId} {
-      allow read;
-
-      allow create: if isSignedIn() && request.resource.data.hostId == request.auth.uid;
-
-      allow update: if isSignedIn() && (
-        // Case 1: Host is making a change.
-        (request.auth.uid == resource.data.hostId) ||
-
-        // Case 2: A new player is joining a waiting lobby.
-        (
-          resource.data.status == 'waiting' &&
-          request.resource.data.players.size() == resource.data.players.size() + 1 &&
-          request.auth.uid in playerMap(request.resource.data.players) &&
-          !(request.auth.uid in playerMap(resource.data.players))
-        ) ||
-        
-        // Case 3: An existing player is updating their own score/guesses.
-        (
-            request.auth.uid in playerMap(resource.data.players) &&
-            // Only players list can be changed by a non-host
-            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['players']) &&
-            // Check that no other player's data was changed
-            playerMap(request.resource.data.players).keys().hasAll(playerMap(resource.data.players).keys()) &&
-            playerMap(request.resource.data.players)[request.auth.uid].score == request.resource.data.players.filter(p => p.uid == request.auth.uid)[0].score &&
-            playerMap(request.resource.data.players)[request.auth.uid].guesses == request.resource.data.players.filter(p => p.uid == request.auth.uid)[0].guesses
-        )
-      );
-
-      allow delete: if isSignedIn() && request.auth.uid == resource.data.hostId;
-    }
-    
-    // Built-in library of helper functions.
-    //  - M.fromList(list, (obj) => obj.key) -> map
-    library M {
-        function fromList(list, keyFn) {
-            return list.reduce(
-                (acc, v) => acc.update(keyFn(v), v),
-                {}
-            )
-        }
+    // WARNING: These rules are insecure and are for testing purposes only.
+    // They allow anyone to read, write, and delete any data in your database.
+    // You should secure your database before deploying to production.
+    match /{document=**} {
+      allow read, write: if true;
     }
   }
 }
