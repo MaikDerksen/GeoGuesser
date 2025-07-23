@@ -272,7 +272,7 @@ export function useGameState(user: User | null, lobbyId: string | null = null) {
             if (gameMode === 'NEAR_ME') {
                 const selectedCategories = Object.entries(nearMeOptions.categories)
                     .filter(([, value]) => value)
-                    .map(([key]) => key.replace(/_/g, " "));
+                    .map(([key]) => key);
 
                 if (selectedCategories.length === 0) {
                     toast({ title: "No Categories", description: "Please select at least one category for 'Near Me' mode.", variant: "destructive" });
