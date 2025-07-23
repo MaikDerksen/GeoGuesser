@@ -9,7 +9,7 @@ import { useDeviceOrientation } from '@/hooks/use-device-orientation';
 import { calculateBearing } from '@/lib/geo';
 import { useToast } from "@/hooks/use-toast";
 import type { User } from 'firebase/auth';
-import { getNearbyLocations } from '@/ai/flows/get-nearby-locations';
+import { getNearbyLocations, type GetNearbyLocationsInput } from '@/ai/flows/get-nearby-locations';
 import { doc, onSnapshot, updateDoc, getDoc, writeBatch, deleteDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { Lobby } from './use-lobby';
@@ -281,7 +281,7 @@ export function useGameState(user: User | null, lobbyId: string | null = null) {
                     return;
                 }
                 
-                const nearMeRequest = { 
+                const nearMeRequest: GetNearbyLocationsInput = { 
                     latitude: userLocation.latitude, 
                     longitude: userLocation.longitude,
                     radius: nearMeOptions.radius,
@@ -311,6 +311,7 @@ export function useGameState(user: User | null, lobbyId: string | null = null) {
                         userId: user.uid,
                         userLocation: {latitude: userLocation.latitude, longitude: userLocation.longitude },
                         nearMeOptions,
+                        request: nearMeRequest,
                         rawResponse: aiLocations,
                         finalLocations: locations,
                      })

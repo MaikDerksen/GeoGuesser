@@ -25,6 +25,7 @@ export interface NearMeGameLog {
         longitude: number;
     };
     nearMeOptions: any;
+    request: any; // The full request sent to the AI
     rawResponse: Location[];
     finalLocations: Location[];
 }
@@ -123,7 +124,8 @@ export async function saveNearMeGameData(data: Omit<NearMeGameLog, 'gameId' | 'c
         createdAt: serverTimestamp(),
     };
     
-    const docRef = doc(db, 'near_me_logs', gameId);
+    // Path: game_modes/NEAR_ME/logs/{gameId}
+    const docRef = doc(db, `game_modes/NEAR_ME/logs/${data.userId}_${gameId}`);
     await setDoc(docRef, logData);
 }
 
