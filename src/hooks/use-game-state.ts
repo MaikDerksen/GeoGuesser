@@ -119,9 +119,10 @@ export function useGameState(user: User | null, lobbyId: string | null = null) {
 
   const totalRounds = useMemo(() => {
     if (gameMode === 'NEAR_ME') {
-        return nearMeOptions.rounds;
+      return nearMeOptions.rounds;
     }
     const selectedMode = gameModes.find(m => m.id === gameMode);
+    // Safely access locations length, defaulting to 0 if locations is undefined
     return selectedMode?.locations?.length || 7;
   }, [gameMode, nearMeOptions.rounds, gameModes]);
 
@@ -419,7 +420,3 @@ export function useGameState(user: User | null, lobbyId: string | null = null) {
     lobby,
   };
 }
-
-    
-
-    

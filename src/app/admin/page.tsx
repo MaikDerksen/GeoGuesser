@@ -4,7 +4,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/use-auth';
 import { useRouter } from 'next/navigation';
-import { Loader2, Plus, Edit, Trash2, X } from 'lucide-react';
+import { Loader2, Plus, Edit, Trash2, X, Database } from 'lucide-react';
 import {
   getAllGameModes,
   addGameMode,
@@ -13,6 +13,7 @@ import {
   addLocationToGameMode,
   updateLocationInGameMode,
   deleteLocationFromGameMode,
+  seedDatabase, // Import the new seed function
   type GameMode,
   type Location
 } from '@/lib/game-data';
@@ -159,6 +160,7 @@ export default function AdminPage() {
   const [editingGameMode, setEditingGameMode] = useState<GameMode | null>(null);
   const [editingLocation, setEditingLocation] = useState<(Location & { index: number }) | undefined>(undefined);
   const [selectedGameModeId, setSelectedGameModeId] = useState<string | null>(null);
+  const [isSeeding, setIsSeeding] = useState(false);
 
 
   const adminUid = process.env.NEXT_PUBLIC_ADMIN_UID;
@@ -234,6 +236,19 @@ export default function AdminPage() {
           }
       }
   }
+
+  const handleSeedDatabase = async () => {
+    setIsSeeding(true);
+    try {
+      await seedDatabase();
+      toast({ title: 'Success', description: 'Sample game modes have been added to your database.' });
+      fetchGameModes();
+    } catch (error: any) {
+       toast({ title: 'Error', description: `Failed to seed database: ${error.message}`, variant: 'destructive' });
+    } finally {
+      setIsSeeding(false);
+    }
+  };
   
   if (authLoading || loading || user?.uid !== adminUid) {
     return (
@@ -249,36 +264,41 @@ export default function AdminPage() {
         <CardHeader>
           <div className="flex justify-between items-center">
              <CardTitle>Admin Dashboard</CardTitle>
-             <Dialog open={isGameModeFormOpen} onOpenChange={setIsGameModeFormOpen}>
-                <DialogTrigger asChild>
-                    <Button onClick={() => { setEditingGameMode(null); setNewGameModeName('');}}>
-                        <Plus className="mr-2 h-4 w-4" /> Add Game Mode
-                    </Button>
-                </DialogTrigger>
-                <DialogContent>
-                    <DialogHeader>
-                        <DialogTitle>{editingGameMode ? 'Edit' : 'Create'} Game Mode</DialogTitle>
-                    </DialogHeader>
-                    <form onSubmit={handleGameModeSubmit} className="space-y-4">
-                        <div>
-                            <Label htmlFor="game-mode-name">Name</Label>
-                            <Input
-                                id="game-mode-name"
-                                value={newGameModeName}
-                                onChange={(e) => setNewGameModeName(e.target.value)}
-                                required
-                            />
-                        </div>
-                         <div className="flex justify-end gap-2">
-                            <Button type="button" variant="ghost" onClick={() => setIsGameModeFormOpen(false)}>Cancel</Button>
-                            <Button type="submit">Save</Button>
-                        </div>
-                    </form>
-                </DialogContent>
-             </Dialog>
+             <div className="flex items-center gap-2">
+                <Button onClick={handleSeedDatabase} variant="outline" disabled={isSeeding}>
+                  { isSeeding ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Database className="mr-2 h-4 w-4" />} Seed Database
+                </Button>
+                <Dialog open={isGameModeFormOpen} onOpenChange={setIsGameModeFormOpen}>
+                    <DialogTrigger asChild>
+                        <Button onClick={() => { setEditingGameMode(null); setNewGameModeName('');}}>
+                            <Plus className="mr-2 h-4 w-4" /> Add Game Mode
+                        </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                        <DialogHeader>
+                            <DialogTitle>{editingGameMode ? 'Edit' : 'Create'} Game Mode</DialogTitle>
+                        </DialogHeader>
+                        <form onSubmit={handleGameModeSubmit} className="space-y-4">
+                            <div>
+                                <Label htmlFor="game-mode-name">Name</Label>
+                                <Input
+                                    id="game-mode-name"
+                                    value={newGameModeName}
+                                    onChange={(e) => setNewGameModeName(e.target.value)}
+                                    required
+                                />
+                            </div>
+                            <div className="flex justify-end gap-2">
+                                <Button type="button" variant="ghost" onClick={() => setIsGameModeFormOpen(false)}>Cancel</Button>
+                                <Button type="submit">Save</Button>
+                            </div>
+                        </form>
+                    </DialogContent>
+                </Dialog>
+             </div>
           </div>
           <CardDescription>
-            Manage game modes and their locations.
+            Manage game modes and their locations. Click "Seed Database" to add sample data.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -287,7 +307,7 @@ export default function AdminPage() {
                 <AccordionItem value={mode.id} key={mode.id}>
                     <AccordionTrigger>
                         <div className="flex items-center justify-between w-full pr-4">
-                            <span className="text-lg font-semibold">{mode.name} ({mode.locations.length} locations)</span>
+                            <span className="text-lg font-semibold">{mode.name} ({mode.locations?.length || 0} locations)</span>
                              <div className="flex items-center gap-2">
                                 <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); setEditingGameMode(mode); setNewGameModeName(mode.name); setIsGameModeFormOpen(true);}}>
                                     <Edit className="h-4 w-4"/>
@@ -333,7 +353,7 @@ export default function AdminPage() {
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                    {mode.locations.map((loc, index) => (
+                                    {mode.locations?.map((loc, index) => (
                                         <TableRow key={`${mode.id}-${index}`}>
                                             <TableCell>{loc.name}</TableCell>
                                             <TableCell>{loc.coordinates.latitude}</TableCell>
@@ -348,7 +368,7 @@ export default function AdminPage() {
                                             </TableCell>
                                         </TableRow>
                                     ))}
-                                    {mode.locations.length === 0 && (
+                                    {(!mode.locations || mode.locations.length === 0) && (
                                         <TableRow>
                                             <TableCell colSpan={4} className="text-center">No locations in this mode.</TableCell>
                                         </TableRow>
