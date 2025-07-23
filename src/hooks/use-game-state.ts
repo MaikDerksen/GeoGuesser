@@ -3,7 +3,7 @@
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import type { Location, GameMode } from '@/lib/game-data';
-import { getGameModes, getLocationsForGameMode } from '@/lib/game-data';
+import { getGameModes, getLocationsForGameMode, saveNearMeGameData } from '@/lib/game-data';
 import { useGeolocation } from '@/hooks/use-geolocation';
 import { useDeviceOrientation } from '@/hooks/use-device-orientation';
 import { calculateBearing } from '@/lib/geo';
@@ -122,7 +122,6 @@ export function useGameState(user: User | null, lobbyId: string | null = null) {
       return nearMeOptions.rounds;
     }
     const selectedMode = gameModes.find(m => m.id === gameMode);
-    // Safely access locations length, defaulting to 0 if locations is undefined
     return selectedMode?.locations?.length || 7;
   }, [gameMode, nearMeOptions.rounds, gameModes]);
 
@@ -257,7 +256,7 @@ export function useGameState(user: User | null, lobbyId: string | null = null) {
 
   useEffect(() => {
     const setupGame = async () => {
-        if (gameState !== 'loading_location' || locationLoading || !gameMode) return;
+        if (gameState !== 'loading_location' || locationLoading || !gameMode || !user) return;
         if (isMultiplayer && !isHost) return;
 
         if (!userLocation) {
@@ -281,13 +280,15 @@ export function useGameState(user: User | null, lobbyId: string | null = null) {
                     setGameLoading(false);
                     return;
                 }
-
-                const aiLocations = await getNearbyLocations({ 
+                
+                const nearMeRequest = { 
                     latitude: userLocation.latitude, 
                     longitude: userLocation.longitude,
                     radius: nearMeOptions.radius,
                     categories: selectedCategories,
-                });
+                };
+
+                const aiLocations = await getNearbyLocations(nearMeRequest);
 
                 const uniqueLocations = aiLocations.filter((location, index, self) =>
                     index === self.findIndex((l) => (
@@ -303,6 +304,21 @@ export function useGameState(user: User | null, lobbyId: string | null = null) {
                     else setGameState('customizing_near_me');
                     return;
                 }
+
+                // Log "Near Me" game data
+                try {
+                     await saveNearMeGameData({
+                        userId: user.uid,
+                        userLocation: {latitude: userLocation.latitude, longitude: userLocation.longitude },
+                        nearMeOptions,
+                        rawResponse: aiLocations,
+                        finalLocations: locations,
+                     })
+                } catch(e) {
+                    console.error("Failed to log 'Near Me' game data", e);
+                    // Do not block the game if logging fails.
+                }
+
             } else {
                 const packLocations = await getLocationsForGameMode(gameMode);
                 locations = [...packLocations].sort(() => 0.5 - Math.random()).slice(0, totalRounds);
@@ -325,7 +341,7 @@ export function useGameState(user: User | null, lobbyId: string | null = null) {
     
     setupGame();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [gameState, gameMode, locationLoading, userLocation, locationError, nearMeOptions, isMultiplayer, isHost, lobbyId]);
+  }, [gameState, gameMode, locationLoading, userLocation, locationError, nearMeOptions, isMultiplayer, isHost, lobbyId, user]);
 
 
   const handleSetGameMode = useCallback(async (mode: GameModeId) => {

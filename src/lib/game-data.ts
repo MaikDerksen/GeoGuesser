@@ -1,6 +1,6 @@
 
 import { db } from './firebase';
-import { collection, getDocs, doc, getDoc, addDoc, updateDoc, deleteDoc, arrayUnion, arrayRemove, writeBatch, setDoc } from 'firebase/firestore';
+import { collection, getDocs, doc, getDoc, addDoc, updateDoc, deleteDoc, arrayUnion, arrayRemove, writeBatch, setDoc, serverTimestamp } from 'firebase/firestore';
 
 export interface Location {
   name: string;
@@ -15,6 +15,20 @@ export interface GameMode {
     name: string;
     locations: Location[];
 }
+
+export interface NearMeGameLog {
+    userId: string;
+    gameId: string;
+    createdAt: any;
+    userLocation: {
+        latitude: number;
+        longitude: number;
+    };
+    nearMeOptions: any;
+    rawResponse: Location[];
+    finalLocations: Location[];
+}
+
 
 export async function getAllGameModes(): Promise<GameMode[]> {
     const gameModesCol = collection(db, 'game_modes');
@@ -100,6 +114,17 @@ export async function deleteLocationFromGameMode(modeId: string, locationIndex: 
     } else {
         throw new Error("Game mode not found.");
     }
+}
+
+export async function saveNearMeGameData(data: Omit<NearMeGameLog, 'gameId' | 'createdAt'>): Promise<void> {
+    const gameId = `${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+    const logData: Omit<NearMeGameLog, 'gameId'> & { createdAt: any } = {
+        ...data,
+        createdAt: serverTimestamp(),
+    };
+    
+    const docRef = doc(db, 'near_me_logs', gameId);
+    await setDoc(docRef, logData);
 }
 
 // Database Seeding Function
