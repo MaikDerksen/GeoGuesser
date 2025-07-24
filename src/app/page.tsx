@@ -5,7 +5,7 @@ import React, { Suspense, useEffect, useState, FormEvent, useCallback } from 're
 import Compass from '@/components/compass';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Loader2, Compass as CompassIcon, QrCode, LogOut, Users, Play, Pin, Settings, Search, Rocket, Globe, PencilRuler, Plus } from 'lucide-react';
+import { Loader2, Compass as CompassIcon, QrCode, LogOut, Users, Play, Pin, Settings, Search, Rocket, Globe, PencilRuler } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import QRCode from "qrcode.react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
@@ -252,7 +252,7 @@ function HomeComponent() {
                 </CardHeader>
                 <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4">
                      <Button onClick={() => setGameState('continent_selection')} size="lg" className="h-24 text-lg" disabled={isMultiplayer && !isHost}>
-                        <Globe className="mr-2"/> Kontinente
+                        <Globe className="mr-2"/> Continents
                     </Button>
                     <Button onClick={() => handleSetGameMode('NEAR_ME')} size="lg" className="h-24 text-lg" disabled={gameLoading || (isMultiplayer && !isHost)}>
                         { gameLoading ? <Loader2 className="animate-spin" /> : <><Pin className="mr-2"/> Near Me</> }
@@ -269,16 +269,14 @@ function HomeComponent() {
         );
       case 'continent_selection':
         return (
-             <Card className="text-center max-w-4xl w-full sm:border sm:bg-card">
-                 <CardHeader>
-                    <CardTitle>Select a Continent</CardTitle>
-                    <CardDescription>Click on a continent on the map to start a game with landmarks from that region.</CardDescription>
-                </CardHeader>
-                 <CardContent>
-                    <WorldMap onSelectContinent={(continent) => handleSetGameMode(continent)} />
-                     <Button variant="link" onClick={() => setGameState('mode_selection')} disabled={isMultiplayer && !isHost}>Back</Button>
-                </CardContent>
-            </Card>
+            <div className="flex flex-col items-center justify-center w-full h-full text-center">
+                 <div className="mb-8">
+                    <h1 className="text-3xl font-bold">Select a Continent</h1>
+                    <p className="text-muted-foreground">Click on a continent on the map to start a game with landmarks from that region.</p>
+                </div>
+                <WorldMap onSelectContinent={(continent) => handleSetGameMode(continent)} />
+                <Button variant="link" onClick={() => setGameState('mode_selection')} disabled={isMultiplayer && !isHost} className="mt-8">Back</Button>
+            </div>
         );
       case 'custom_game_list':
         return (
@@ -293,7 +291,7 @@ function HomeComponent() {
                     ))}
                 </CardContent>
                  <CardContent className="mt-4">
-                    <Button onClick={() => router.push('/admin')} disabled={isMultiplayer && !isHost}><Plus className="mr-2"/> Create New List</Button>
+                    <Button onClick={() => router.push('/admin')} disabled={isMultiplayer && !isHost}><PencilRuler className="mr-2"/> Create New List</Button>
                     <div className="mt-2">
                         <Button variant="link" onClick={() => setGameState('mode_selection')} disabled={isMultiplayer && !isHost}>Back</Button>
                     </div>
@@ -488,6 +486,7 @@ export default function Home() {
 
 
     
+
 
 
 
