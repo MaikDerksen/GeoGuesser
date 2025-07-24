@@ -31,7 +31,7 @@ const PlaceSchema = z.object({
 
 const PlacesApiResponseSchema = z.object({
   places: z.array(PlaceSchema).optional(),
-  nextPageToken: z.string().optional(),
+  nextPageToken: z.string().nullable().optional(),
 });
 
 // Define the schema for the AI's input, which includes the raw places data
@@ -126,9 +126,9 @@ const getNearbyLocationsFlow = ai.defineFlow(
             }
 
             let currentPage = 0;
-            let nextPageToken: string | undefined = undefined;
+            let nextPageToken: string | null | undefined = undefined;
 
-            const requestBody: any = {
+            const initialRequestBody: any = {
                 includedTypes: input.categories,
                 maxResultCount: 20, // Max per page
                 locationRestriction: {
@@ -144,8 +144,13 @@ const getNearbyLocationsFlow = ai.defineFlow(
 
             do {
                 currentPage++;
+                let requestBody: any;
                 if (nextPageToken) {
-                    requestBody.pageToken = nextPageToken;
+                    // For subsequent pages, only send the pageToken.
+                    requestBody = { pageToken: nextPageToken };
+                } else {
+                    // For the first page, send the full query.
+                    requestBody = initialRequestBody;
                 }
 
                 const placesResponse = await fetch('https://places.googleapis.com/v1/places:searchNearby', {
