@@ -3,7 +3,7 @@
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import type { Location, GameMode } from '@/lib/game-data';
-import { getGameModes, getLocationsForGameMode, saveNearMeGameData } from '@/lib/game-data';
+import { getGameModes, getUserGameModes, getLocationsForGameMode, saveNearMeGameData } from '@/lib/game-data';
 import { useGeolocation } from '@/hooks/use-geolocation';
 import { useDeviceOrientation } from '@/hooks/use-device-orientation';
 import { calculateBearing } from '@/lib/geo';
@@ -41,6 +41,8 @@ export function useGameState(user: User | null, lobbyId: string | null = null) {
   const [timeLeft, setTimeLeft] = useState(ROUND_TIMER);
   const [gameLoading, setGameLoading] = useState(false);
   const [gameModes, setGameModes] = useState<GameMode[]>([]);
+  const [userGameModes, setUserGameModes] = useState<GameMode[]>([]);
+
 
   const [target, setTarget] = useState<Location | null>(null);
   const [userGuess, setUserGuess] = useState<number | null>(null);
@@ -85,7 +87,13 @@ export function useGameState(user: User | null, lobbyId: string | null = null) {
         console.error("Failed to fetch game modes:", err);
         toast({ title: "Error", description: "Could not fetch game modes from the server.", variant: "destructive" });
     });
-   }, [toast]);
+    if(user){
+        getUserGameModes(user.uid).then(setUserGameModes).catch(err => {
+            console.error("Failed to fetch user game modes:", err);
+            toast({ title: "Error", description: "Could not fetch your custom game modes.", variant: "destructive" });
+        });
+    }
+   }, [toast, user]);
     
    // Get user location once on initial load for explorer mode and caching
    useEffect(() => {
@@ -134,9 +142,10 @@ export function useGameState(user: User | null, lobbyId: string | null = null) {
     if (gameMode === 'NEAR_ME') {
       return nearMeOptions.rounds;
     }
-    const selectedMode = gameModes.find(m => m.id === gameMode);
+    const allModes = [...gameModes, ...userGameModes];
+    const selectedMode = allModes.find(m => m.id === gameMode);
     return selectedMode?.locations?.length || 7;
-  }, [gameMode, nearMeOptions.rounds, gameModes]);
+  }, [gameMode, nearMeOptions.rounds, gameModes, userGameModes]);
 
   // Set App URL for QR Code
   useEffect(() => {
@@ -318,7 +327,6 @@ export function useGameState(user: User | null, lobbyId: string | null = null) {
                      })
                 } catch(e) {
                     console.error("Failed to log 'Near Me' game data", e);
-                    // Do not block the game if logging fails.
                 }
 
             } else {
@@ -346,7 +354,7 @@ export function useGameState(user: User | null, lobbyId: string | null = null) {
   }, [gameState, gameMode, locationLoading, userLocation, locationError, nearMeOptions, isMultiplayer, isHost, lobbyId, user]);
 
 
-  const handleSetGameMode = useCallback(async (mode: GameModeId) => {
+  const handleSetGameMode = useCallback(async (modeKey: GameModeId) => {
     
     const continentMap: { [key: string]: string } = {
         'america': 'USA Landmarks',
@@ -357,13 +365,14 @@ export function useGameState(user: User | null, lobbyId: string | null = null) {
         'australia': 'Oceania'
     };
 
-    const targetGameName = continentMap[mode] || mode;
+    const targetGameName = continentMap[modeKey] || modeKey;
 
     let selectedMode: GameMode | undefined;
-    if (targetGameName !== 'NEAR_ME') {
-        selectedMode = gameModes.find(m => m.name === targetGameName || m.id === targetGameName);
-    } else {
+     if (targetGameName === 'NEAR_ME') {
         selectedMode = { id: 'NEAR_ME', name: 'NEAR_ME', locations: []};
+    } else {
+        const allModes = [...gameModes, ...userGameModes];
+        selectedMode = allModes.find(m => m.name === targetGameName || m.id === targetGameName);
     }
 
     if (!selectedMode) {
@@ -387,7 +396,7 @@ export function useGameState(user: User | null, lobbyId: string | null = null) {
     
     prepareGame();
 
-  }, [prepareGame, isMultiplayer, lobbyId, isHost, gameModes, toast]);
+  }, [prepareGame, isMultiplayer, lobbyId, isHost, gameModes, userGameModes, toast]);
 
   const handleStartNearMe = useCallback(() => {
     prepareGame();
@@ -452,7 +461,7 @@ export function useGameState(user: User | null, lobbyId: string | null = null) {
     handleGuess,
     appUrl,
     gameMode,
-    gameModes,
+    gameModes: userGameModes, // Only expose user-created modes to UI
     loading: gameLoading,
     nearMeOptions,
     setNearMeOptions,

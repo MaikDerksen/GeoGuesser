@@ -1,19 +1,18 @@
 
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/hooks/use-auth';
 import { useRouter } from 'next/navigation';
-import { Loader2, Plus, Edit, Trash2, Database, Users } from 'lucide-react';
+import { Loader2, Plus, Edit, Trash2, Users } from 'lucide-react';
 import {
-  getAllGameModes,
+  getUserGameModes,
   addGameMode,
   updateGameMode,
   deleteGameMode,
   addLocationToGameMode,
   updateLocationInGameMode,
   deleteLocationFromGameMode,
-  seedDatabase,
   type GameMode,
   type Location
 } from '@/lib/game-data';
@@ -160,7 +159,19 @@ export default function AdminPage() {
   const [editingGameMode, setEditingGameMode] = useState<GameMode | null>(null);
   const [editingLocation, setEditingLocation] = useState<(Location & { index: number }) | undefined>(undefined);
   const [selectedGameModeId, setSelectedGameModeId] = useState<string | null>(null);
-  const [isSeeding, setIsSeeding] = useState(false);
+
+  const fetchGameModes = useCallback(async () => {
+    if (!user) return;
+    setLoading(true);
+    try {
+      const modes = await getUserGameModes(user.uid);
+      setGameModes(modes);
+    } catch (error: any) {
+      toast({ title: 'Error', description: `Could not fetch game modes: ${error.message}`, variant: 'destructive' });
+    } finally {
+      setLoading(false);
+    }
+  }, [user, toast]);
 
   useEffect(() => {
     if (!authLoading) {
@@ -170,23 +181,12 @@ export default function AdminPage() {
          fetchGameModes();
       }
     }
-  }, [user, authLoading, router]);
+  }, [user, authLoading, router, fetchGameModes]);
 
-  const fetchGameModes = async () => {
-    setLoading(true);
-    try {
-      const modes = await getAllGameModes();
-      setGameModes(modes);
-    } catch (error: any) {
-      toast({ title: 'Error', description: `Could not fetch game modes: ${error.message}`, variant: 'destructive' });
-    } finally {
-      setLoading(false);
-    }
-  };
   
   const handleGameModeSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newGameModeName) return;
+    if (!newGameModeName || !user) return;
 
     try {
         if(editingGameMode) {
@@ -194,7 +194,7 @@ export default function AdminPage() {
             toast({ title: 'Success', description: `Game mode "${newGameModeName}" updated.` });
 
         } else {
-             await addGameMode({ name: newGameModeName, locations: [] });
+             await addGameMode({ name: newGameModeName, locations: [], userId: user.uid });
              toast({ title: 'Success', description: `Game mode "${newGameModeName}" created.` });
         }
        
@@ -231,19 +231,6 @@ export default function AdminPage() {
       }
   }
 
-  const handleSeedDatabase = async () => {
-    setIsSeeding(true);
-    try {
-      await seedDatabase();
-      toast({ title: 'Success', description: 'Sample game modes have been added to your database.' });
-      fetchGameModes();
-    } catch (error: any) {
-       toast({ title: 'Error', description: `Failed to seed database: ${error.message}`, variant: 'destructive' });
-    } finally {
-      setIsSeeding(false);
-    }
-  };
-  
   if (authLoading || loading) {
     return (
       <div className="flex h-screen items-center justify-center">
@@ -256,12 +243,14 @@ export default function AdminPage() {
     <main className="container mx-auto p-4 md:p-8">
       <Card>
         <CardHeader>
-          <div className="flex justify-between items-center">
-             <CardTitle className="flex items-center gap-2"><Users /> Custom Game Modes</CardTitle>
+          <div className="flex flex-wrap justify-between items-center gap-4">
+             <div className="flex-grow">
+                <CardTitle className="flex items-center gap-2"><Users /> Custom Game Modes</CardTitle>
+                 <CardDescription>
+                    Create and manage your own custom location lists to play with friends.
+                </CardDescription>
+             </div>
              <div className="flex items-center gap-2">
-                <Button onClick={handleSeedDatabase} variant="outline" disabled={isSeeding}>
-                  { isSeeding ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Database className="mr-2 h-4 w-4" />} Seed Sample Data
-                </Button>
                 <Dialog open={isGameModeFormOpen} onOpenChange={setIsGameModeFormOpen}>
                     <DialogTrigger asChild>
                         <Button onClick={() => { setEditingGameMode(null); setNewGameModeName('');}}>
@@ -291,29 +280,26 @@ export default function AdminPage() {
                 </Dialog>
              </div>
           </div>
-          <CardDescription>
-            Create and manage your own custom location lists to play with friends.
-          </CardDescription>
         </CardHeader>
         <CardContent>
            <Accordion type="single" collapsible className="w-full">
             {gameModes.map(mode => (
                 <AccordionItem value={mode.id} key={mode.id}>
-                    <div className="flex items-center justify-between w-full pr-4 py-4">
-                        <AccordionTrigger className="flex-1">
-                            <span className="text-lg font-semibold">{mode.name} ({mode.locations?.length || 0} locations)</span>
-                        </AccordionTrigger>
-                         <div className="flex items-center gap-2 pl-4">
-                            <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); setEditingGameMode(mode); setNewGameModeName(mode.name); setIsGameModeFormOpen(true);}}>
-                                <Edit className="h-4 w-4"/>
-                            </Button>
-                             <Button size="sm" variant="destructive" onClick={(e) => { e.stopPropagation(); handleDeleteGameMode(mode.id, mode.name);}}>
-                                <Trash2 className="h-4 w-4"/>
-                            </Button>
+                     <AccordionTrigger className="flex-1 hover:no-underline">
+                        <div className="flex items-center justify-between w-full">
+                            <span className="text-lg font-semibold text-left">{mode.name} ({mode.locations?.length || 0} locations)</span>
+                            <div className="flex items-center gap-2 pl-4" onClick={(e) => e.stopPropagation()}>
+                                <Button size="sm" variant="outline" onClick={() => { setEditingGameMode(mode); setNewGameModeName(mode.name); setIsGameModeFormOpen(true);}}>
+                                    <Edit className="h-4 w-4"/>
+                                </Button>
+                                <Button size="sm" variant="destructive" onClick={() => handleDeleteGameMode(mode.id, mode.name)}>
+                                    <Trash2 className="h-4 w-4"/>
+                                </Button>
+                            </div>
                         </div>
-                    </div>
+                    </AccordionTrigger>
                     <AccordionContent>
-                        <div className="p-4 bg-muted/40 rounded-lg">
+                        <div className="p-1 md:p-4 bg-muted/40 rounded-lg">
                              <div className="flex justify-end mb-4">
                                 <Dialog open={isLocationFormOpen && selectedGameModeId === mode.id} onOpenChange={(open) => {
                                     if (!open) {
@@ -323,7 +309,7 @@ export default function AdminPage() {
                                     setIsLocationFormOpen(open);
                                 }}>
                                     <DialogTrigger asChild>
-                                        <Button onClick={() => setSelectedGameModeId(mode.id)}>
+                                        <Button onClick={() => { setEditingLocation(undefined); setSelectedGameModeId(mode.id); setIsLocationFormOpen(true);}}>
                                             <Plus className="mr-2 h-4 w-4"/> Add Location
                                         </Button>
                                     </DialogTrigger>
@@ -337,46 +323,55 @@ export default function AdminPage() {
                                     </DialogContent>
                                 </Dialog>
                             </div>
-                             <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead>Name</TableHead>
-                                        <TableHead>Latitude</TableHead>
-                                        <TableHead>Longitude</TableHead>
-                                        <TableHead className="text-right">Actions</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {mode.locations?.map((loc, index) => (
-                                        <TableRow key={`${mode.id}-${index}`}>
-                                            <TableCell>{loc.name}</TableCell>
-                                            <TableCell>{loc.coordinates.latitude}</TableCell>
-                                            <TableCell>{loc.coordinates.longitude}</TableCell>
-                                            <TableCell className="text-right">
-                                                <Button variant="ghost" size="icon" onClick={() => { setSelectedGameModeId(mode.id); setEditingLocation({ ...loc, index }); setIsLocationFormOpen(true); }}>
-                                                    <Edit className="h-4 w-4"/>
-                                                </Button>
-                                                <Button variant="ghost" size="icon" onClick={() => handleDeleteLocation(mode.id, index, loc.name)}>
-                                                    <Trash2 className="h-4 w-4 text-destructive"/>
-                                                </Button>
-                                            </TableCell>
-                                        </TableRow>
-                                    ))}
-                                    {(!mode.locations || mode.locations.length === 0) && (
+                            <div className="overflow-x-auto">
+                                <Table>
+                                    <TableHeader>
                                         <TableRow>
-                                            <TableCell colSpan={4} className="text-center">No locations in this mode.</TableCell>
+                                            <TableHead>Name</TableHead>
+                                            <TableHead>Latitude</TableHead>
+                                            <TableHead>Longitude</TableHead>
+                                            <TableHead className="text-right">Actions</TableHead>
                                         </TableRow>
-                                    )}
-                                </TableBody>
-                            </Table>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {mode.locations?.map((loc, index) => (
+                                            <TableRow key={`${mode.id}-${index}`}>
+                                                <TableCell className="font-medium">{loc.name}</TableCell>
+                                                <TableCell>{loc.coordinates.latitude.toFixed(4)}</TableCell>
+                                                <TableCell>{loc.coordinates.longitude.toFixed(4)}</TableCell>
+                                                <TableCell className="text-right">
+                                                    <div className="flex justify-end items-center">
+                                                        <Button variant="ghost" size="icon" onClick={() => { setSelectedGameModeId(mode.id); setEditingLocation({ ...loc, index }); setIsLocationFormOpen(true); }}>
+                                                            <Edit className="h-4 w-4"/>
+                                                        </Button>
+                                                        <Button variant="ghost" size="icon" onClick={() => handleDeleteLocation(mode.id, index, loc.name)}>
+                                                            <Trash2 className="h-4 w-4 text-destructive"/>
+                                                        </Button>
+                                                    </div>
+                                                </TableCell>
+                                            </TableRow>
+                                        ))}
+                                        {(!mode.locations || mode.locations.length === 0) && (
+                                            <TableRow>
+                                                <TableCell colSpan={4} className="text-center">No locations in this mode.</TableCell>
+                                            </TableRow>
+                                        )}
+                                    </TableBody>
+                                </Table>
+                            </div>
                         </div>
                     </AccordionContent>
                 </AccordionItem>
             ))}
            </Accordion>
+           {gameModes.length === 0 && (
+                <div className="text-center text-muted-foreground py-8">
+                    <p>You haven't created any game modes yet.</p>
+                    <p>Click "Add New Game Mode" to get started!</p>
+                </div>
+           )}
         </CardContent>
       </Card>
     </main>
   );
 }
-

@@ -14,6 +14,8 @@ export interface GameMode {
     id: string;
     name: string;
     locations: Location[];
+    userId?: string; // To distinguish user-created modes
+    isDefault?: boolean; // To identify seeded data
 }
 
 export interface NearMeGameLog {
@@ -51,6 +53,18 @@ export async function getAllGameModes(): Promise<GameMode[]> {
     return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as GameMode));
 }
 
+export async function getUserGameModes(userId: string): Promise<GameMode[]> {
+    if (!userId) return [];
+    const gameModesCol = collection(db, 'game_modes');
+    const q = query(gameModesCol, where("userId", "==", userId));
+    const snapshot = await getDocs(q);
+    if (snapshot.empty) {
+        return [];
+    }
+    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as GameMode));
+}
+
+
 export async function getGameModes(): Promise<GameMode[]> {
    return getAllGameModes();
 }
@@ -71,7 +85,7 @@ export async function getLocationsForGameMode(gameModeId: string): Promise<Locat
 
 
 // Admin Functions
-export async function addGameMode(newMode: Omit<GameMode, 'id'>): Promise<string> {
+export async function addGameMode(newMode: Omit<GameMode, 'id' | 'isDefault'>): Promise<string> {
     const gameModesCol = collection(db, 'game_modes');
     const docRef = await addDoc(gameModesCol, newMode);
     return docRef.id;
@@ -119,7 +133,10 @@ export async function deleteLocationFromGameMode(modeId: string, locationIndex: 
         const newLocations = [...gameMode.locations];
          if (locationIndex >= 0 && locationIndex < newLocations.length) {
             const locationToRemove = newLocations[locationIndex];
-            await updateDoc(docRef, { locations: arrayRemove(locationToRemove) });
+            // This is tricky because arrayRemove needs the exact object.
+            // A more robust way is to read, modify, and write the whole array.
+             newLocations.splice(locationIndex, 1);
+             await updateDoc(docRef, { locations: newLocations });
         } else {
             throw new Error("Location index out of bounds.");
         }
@@ -144,9 +161,7 @@ export async function saveNearMeGameData(data: Omit<NearMeGameLog, 'gameId' | 'c
 export async function findLocationCache(lat: number, lon: number, radius: number): Promise<LocationCache | null> {
     const cacheRef = collection(db, 'location_cache');
 
-    // Firestore doesn't support native geospatial queries like "is point in circle".
-    // We'll approximate by querying a bounding box and then doing the precise check on the client.
-    const latDegrees = radius / 111320; // ~111.32 km per degree of latitude
+    const latDegrees = radius / 111320; 
     const lonDegrees = radius / (111320 * Math.cos(lat * (Math.PI / 180)));
 
     const minLat = lat - latDegrees;
@@ -158,7 +173,7 @@ export async function findLocationCache(lat: number, lon: number, radius: number
         cacheRef,
         where('center.latitude', '>=', minLat),
         where('center.latitude', '<=', maxLat),
-        limit(20) // Limit to reduce client-side processing
+        limit(20)
     );
 
     const snapshot = await getDocs(q);
@@ -170,10 +185,8 @@ export async function findLocationCache(lat: number, lon: number, radius: number
 
     for (const doc of snapshot.docs) {
         const cache = doc.data() as LocationCache;
-        // Simple longitude check (doesn't cross antimeridian)
         if (cache.center.longitude >= minLon && cache.center.longitude <= maxLon) {
              const cachePoint = { lat: cache.center.latitude, lon: cache.center.longitude };
-             // Haversine distance calculation
             const R = 6371e3; // metres
             const φ1 = searchPoint.lat * Math.PI/180;
             const φ2 = cachePoint.lat * Math.PI/180;
@@ -208,9 +221,9 @@ export async function saveLocationCache(cache: Omit<LocationCache, 'id' | 'creat
 
 // Database Seeding Function
 export async function seedDatabase(): Promise<void> {
-    const sampleGameModes: Omit<GameMode, 'id'>[] = [
+    const sampleGameModes: Omit<GameMode, 'id' | 'userId'>[] = [
         {
-            name: 'USA Landmarks',
+            name: 'USA Landmarks', isDefault: true,
             locations: [
                 { name: 'Statue of Liberty', coordinates: { latitude: 40.6892, longitude: -74.0445 } },
                 { name: 'Golden Gate Bridge', coordinates: { latitude: 37.8199, longitude: -122.4783 } },
@@ -220,7 +233,7 @@ export async function seedDatabase(): Promise<void> {
             ]
         },
         {
-            name: 'World Wonders',
+            name: 'World Wonders', isDefault: true,
             locations: [
                 { name: 'Great Wall of China', coordinates: { latitude: 40.4319, longitude: 116.5704 } },
                 { name: 'Petra', coordinates: { latitude: 30.3285, longitude: 35.4444 } },
@@ -232,7 +245,7 @@ export async function seedDatabase(): Promise<void> {
             ]
         },
         {
-            name: 'Europe',
+            name: 'Europe', isDefault: true,
             locations: [
                 { name: 'Big Ben', coordinates: { latitude: 51.5007, longitude: -0.1246 } },
                 { name: 'Brandenburg Gate', coordinates: { latitude: 52.5163, longitude: 13.3777 } },
@@ -241,7 +254,7 @@ export async function seedDatabase(): Promise<void> {
             ]
         },
         {
-            name: 'Asia',
+            name: 'Asia', isDefault: true,
             locations: [
                 { name: 'Mount Fuji', coordinates: { latitude: 35.3606, longitude: 138.7274 } },
                 { name: 'Angkor Wat', coordinates: { latitude: 13.4125, longitude: 103.8667 } },
@@ -250,7 +263,7 @@ export async function seedDatabase(): Promise<void> {
             ]
         },
         {
-            name: 'Africa',
+            name: 'Africa', isDefault: true,
             locations: [
                 { name: 'Pyramids of Giza', coordinates: { latitude: 29.9792, longitude: 31.1342 } },
                 { name: 'Victoria Falls', coordinates: { latitude: -17.9243, longitude: 25.8572 } },
@@ -259,7 +272,7 @@ export async function seedDatabase(): Promise<void> {
             ]
         },
         {
-            name: 'Latin America',
+            name: 'Latin America', isDefault: true,
             locations: [
                 { name: 'Chichen Itza', coordinates: { latitude: 20.6843, longitude: -88.5678 } },
                 { name: 'Angel Falls', coordinates: { latitude: 5.9689, longitude: -62.5358 } },
@@ -268,7 +281,7 @@ export async function seedDatabase(): Promise<void> {
             ]
         },
         {
-            name: 'Middle East',
+            name: 'Middle East', isDefault: true,
             locations: [
                 { name: 'Burj Khalifa', coordinates: { latitude: 25.1972, longitude: 55.2744 } },
                 { name: 'Hagia Sophia', coordinates: { latitude: 41.0086, longitude: 28.9802 } },
@@ -277,7 +290,7 @@ export async function seedDatabase(): Promise<void> {
             ]
         },
         {
-            name: 'Oceania',
+            name: 'Oceania', isDefault: true,
             locations: [
                 { name: 'Sydney Opera House', coordinates: { latitude: -33.8568, longitude: 151.2153 } },
                 { name: 'Uluru', coordinates: { latitude: -25.3444, longitude: 131.0369 } },
@@ -286,7 +299,7 @@ export async function seedDatabase(): Promise<void> {
             ]
         },
         {
-            name: 'Arctic/Antarctic',
+            name: 'Arctic/Antarctic', isDefault: true,
             locations: [
                 { name: 'McMurdo Station', coordinates: { latitude: -77.8463, longitude: 166.6682 } },
                 { name: 'South Pole Telescope', coordinates: { latitude: -89.9911, longitude: -45.0000 } },
@@ -297,8 +310,9 @@ export async function seedDatabase(): Promise<void> {
     ];
 
     const batch = writeBatch(db);
-    const existingModes = await getAllGameModes();
-    const existingModeNames = new Set(existingModes.map(m => m.name));
+    const q = query(collection(db, 'game_modes'), where('isDefault', '==', true));
+    const existingModesSnapshot = await getDocs(q);
+    const existingModeNames = new Set(existingModesSnapshot.docs.map(doc => doc.data().name));
 
     sampleGameModes.forEach(mode => {
         if (!existingModeNames.has(mode.name)) {
