@@ -5,7 +5,7 @@ import React, { Suspense, useEffect, useState, FormEvent, useCallback } from 're
 import Compass from '@/components/compass';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Loader2, Compass as CompassIcon, QrCode, LogOut, Users, Play, Pin, Settings, Search, Rocket } from 'lucide-react';
+import { Loader2, Compass as CompassIcon, QrCode, LogOut, Users, Play, Pin, Settings, Search, Rocket, Globe, PencilRuler } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import QRCode from "qrcode.react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
@@ -21,6 +21,7 @@ import { Input } from '@/components/ui/input';
 import { getCoordinatesForAddress } from '@/ai/flows/get-coordinates-for-address';
 import { getAddressPredictions, type GetAddressPredictionsOutput } from '@/ai/flows/get-address-predictions';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import WorldMap from '@/components/world-map';
 
 
 // Self-contained component for the Explorer search functionality to prevent focus loss
@@ -166,7 +167,6 @@ function HomeComponent() {
     gameModes,
     handleSetGameMode,
     handleStart,
-    handleGuess,
     handleGrantPermission,
     permissionState,
     resetGame,
@@ -188,15 +188,18 @@ function HomeComponent() {
   }, [authLoading, user, router]);
 
 
-  const handleModeSelection = (mode: 'single' | 'multiplayer' | 'explorer') => {
+  const handleModeSelection = (mode: 'single' | 'multiplayer' | 'explorer' | 'custom_game_list') => {
     if (mode === 'multiplayer') {
       router.push('/lobby');
     } else {
-       if (permissionState !== 'granted') {
+       if (permissionState !== 'granted' && (mode !== 'custom_game_list')) {
           setNextState(mode === 'single' ? 'mode_selection' : 'explorer');
           setGameState('permission');
        } else {
-         setGameState(mode === 'single' ? 'mode_selection' : 'explorer');
+         if (mode === 'single') setGameState('mode_selection');
+         else if (mode === 'explorer') setGameState('explorer');
+         else if (mode === 'custom_game_list') router.push('/admin');
+
        }
     }
   };
@@ -241,22 +244,58 @@ function HomeComponent() {
         );
       case 'mode_selection':
         return (
-            <Card className="text-center max-w-md">
+            <Card className="text-center max-w-lg w-full">
                 <CardHeader>
-                    <CardTitle>Choose a Game Mode</CardTitle>
-                    <CardDescription>Select a set of locations to play with.</CardDescription>
+                    <CardTitle>Choose a Game Type</CardTitle>
+                    <CardDescription>Select how you want to play.</CardDescription>
                 </CardHeader>
-                <CardContent className="grid grid-cols-2 gap-4">
-                    {gameModes.map((mode: GameMode) => (
-                        <Button key={mode.id} onClick={() => handleSetGameMode(mode.id)} size="lg" disabled={isMultiplayer && !isHost}>{mode.name}</Button>
-                    ))}
-                    <Button onClick={() => handleSetGameMode('NEAR_ME')} size="lg" disabled={gameLoading || (isMultiplayer && !isHost)}>
-                        { gameLoading ? <Loader2 className="animate-spin" /> : <><Pin /> Near Me</> }
+                <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                     <Button onClick={() => setGameState('continent_selection')} size="lg" className="h-24 text-lg" disabled={isMultiplayer && !isHost}>
+                        <Globe className="mr-2"/> Kontinente
+                    </Button>
+                    <Button onClick={() => handleSetGameMode('NEAR_ME')} size="lg" className="h-24 text-lg" disabled={gameLoading || (isMultiplayer && !isHost)}>
+                        { gameLoading ? <Loader2 className="animate-spin" /> : <><Pin className="mr-2"/> Near Me</> }
+                    </Button>
+                     <Button onClick={() => setGameState('custom_game_list')} size="lg" className="h-24 text-lg" disabled={isMultiplayer && !isHost}>
+                        <PencilRuler className="mr-2"/> Custom
                     </Button>
                 </CardContent>
                  <CardContent>
                     { !isMultiplayer && <Button variant="link" onClick={() => resetGame()}>Back to main menu</Button> }
                     { isMultiplayer && !isHost && <p className="text-muted-foreground">Waiting for host to select a mode...</p>}
+                </CardContent>
+            </Card>
+        );
+      case 'continent_selection':
+        return (
+             <Card className="text-center max-w-4xl w-full">
+                 <CardHeader>
+                    <CardTitle>Select a Continent</CardTitle>
+                    <CardDescription>Click on a continent on the map to start a game with landmarks from that region.</CardDescription>
+                </CardHeader>
+                 <CardContent>
+                    <WorldMap onSelectContinent={(continent) => handleSetGameMode(continent)} />
+                     <Button variant="link" onClick={() => setGameState('mode_selection')} disabled={isMultiplayer && !isHost}>Back</Button>
+                </CardContent>
+            </Card>
+        );
+      case 'custom_game_list':
+        return (
+             <Card className="text-center max-w-md w-full">
+                <CardHeader>
+                    <CardTitle>Custom Games</CardTitle>
+                    <CardDescription>Play a game from the list or create your own.</CardDescription>
+                </CardHeader>
+                <CardContent className="grid grid-cols-2 gap-4">
+                    {gameModes.map((mode: GameMode) => (
+                        <Button key={mode.id} onClick={() => handleSetGameMode(mode.id)} size="lg" disabled={isMultiplayer && !isHost}>{mode.name}</Button>
+                    ))}
+                </CardContent>
+                 <CardContent className="mt-4">
+                    <Button onClick={() => router.push('/admin')} disabled={isMultiplayer && !isHost}><Plus className="mr-2"/> Create New List</Button>
+                    <div className="mt-2">
+                        <Button variant="link" onClick={() => setGameState('mode_selection')} disabled={isMultiplayer && !isHost}>Back</Button>
+                    </div>
                 </CardContent>
             </Card>
         );
@@ -332,7 +371,7 @@ function HomeComponent() {
             <div className="flex flex-col items-center gap-4 text-center">
                 <Loader2 className="h-12 w-12 animate-spin text-primary" />
                 <p className="text-lg text-muted-foreground">Acquiring satellite lock...</p>
-                <p className="text-sm text-muted-foreground/80">({ gameMode === 'NEAR_ME' ? 'Finding cool places near you' : 'Getting your location'})</p>
+                <p className="text-sm text-muted-foreground/80">({ (gameMode === 'NEAR_ME' || !gameMode) ? 'Finding cool places near you' : `Getting locations for ${gameMode}`})</p>
             </div>
         );
       case 'playing':
@@ -448,6 +487,7 @@ export default function Home() {
 
 
     
+
 
 
 

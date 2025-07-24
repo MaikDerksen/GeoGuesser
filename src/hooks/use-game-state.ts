@@ -15,8 +15,8 @@ import { db } from '@/lib/firebase';
 import type { Lobby } from './use-lobby';
 
 
-type GameState = 'idle' | 'mode_selection' | 'permission' | 'customizing_near_me' | 'loading_location' | 'playing' | 'results' | 'explorer';
-type GameModeId = string | 'NEAR_ME';
+type GameState = 'idle' | 'mode_selection' | 'permission' | 'customizing_near_me' | 'loading_location' | 'playing' | 'results' | 'explorer' | 'continent_selection' | 'custom_game_list';
+type GameModeId = string;
 
 interface NearMeOptions {
     radius: number;
@@ -52,7 +52,6 @@ export function useGameState(user: User | null, lobbyId: string | null = null) {
   const [lobby, setLobby] = useState<Lobby | null>(null);
   const isMultiplayer = !!lobbyId;
   const isHost = user?.uid === lobby?.hostId;
-
 
   const { data: userLocation, loading: locationLoading, error: locationError, getLocation } = useGeolocation();
   const { orientation, error: orientationError, requestPermission, permissionState } = useDeviceOrientation();
@@ -96,15 +95,7 @@ export function useGameState(user: User | null, lobbyId: string | null = null) {
    }, [permissionState, getLocation]);
 
    useEffect(() => {
-    if (!lobbyId) {
-        // If not in a multiplayer lobby, ensure we aren't stuck in a game state that requires a lobby
-        if (lobby) setLobby(null);
-        if (gameState !== 'idle' && gameState !== 'mode_selection' && gameState !== 'explorer' && gameState !== 'customizing_near_me' && gameState !== 'permission' && !gameMode) {
-            // If we are in a game state without a game mode (and not in a lobby), something is wrong. Reset.
-            // But allow being in mode_selection etc.
-        }
-        return;
-    }
+    if (!lobbyId) return;
 
     const unsub = onSnapshot(doc(db, 'lobbies', lobbyId), (doc) => {
         if (doc.exists()) {
@@ -143,7 +134,7 @@ export function useGameState(user: User | null, lobbyId: string | null = null) {
     if (gameMode === 'NEAR_ME') {
       return nearMeOptions.rounds;
     }
-    const selectedMode = gameModes.find(m => m.id === gameMode);
+    const selectedMode = gameModes.find(m => m.id === gameMode || m.name === gameMode);
     return selectedMode?.locations?.length || 7;
   }, [gameMode, nearMeOptions.rounds, gameModes]);
 
@@ -200,7 +191,6 @@ export function useGameState(user: User | null, lobbyId: string | null = null) {
                     currentGuesses.push(null);
                 }
                 currentGuesses[lobbyData.currentRound - 1] = angle;
-                newPlayers[playerIndex].guesses = currentGuesses;
                 newPlayers[playerIndex].score += roundPoints;
 
                 batch.update(lobbyRef, { players: newPlayers });
@@ -254,7 +244,7 @@ export function useGameState(user: User | null, lobbyId: string | null = null) {
   }, [currentLocationSet, resetGame, toast, isHost, isMultiplayer, currentRound, lobbyId]);
 
 
-  const prepareGame = useCallback(async () => {
+  const prepareGame = useCallback(() => {
     if (isMultiplayer && !isHost) return;
 
     setGameState('loading_location');
@@ -413,6 +403,13 @@ export function useGameState(user: User | null, lobbyId: string | null = null) {
       resetGame();
     }
   }, [user, resetGame]);
+
+  useEffect(() => {
+    if (!isMultiplayer && gameState !== 'idle' && gameState !== 'permission' && gameState !== 'explorer' && gameState !== 'mode_selection' && gameState !== 'customizing_near_me' && gameState !== 'continent_selection' && gameState !== 'custom_game_list' && !gameMode) {
+        resetGame();
+    }
+  }, [isMultiplayer, gameState, gameMode, resetGame]);
+
 
   return {
     gameState,

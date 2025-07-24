@@ -25,7 +25,7 @@ export default function RootLayout({
       <body className="font-body antialiased">
         <header className="absolute top-0 left-0 p-4">
             <Button asChild variant="link"><Link href="/">Home</Link></Button>
-            {process.env.NEXT_PUBLIC_ADMIN_UID && <Button asChild variant="link"><Link href="/admin">Admin</Link></Button>}
+            <Button asChild variant="link"><Link href="/admin">Custom Games</Link></Button>
         </header>
         {children}
         <Toaster />

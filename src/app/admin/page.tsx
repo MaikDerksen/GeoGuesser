@@ -4,7 +4,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/use-auth';
 import { useRouter } from 'next/navigation';
-import { Loader2, Plus, Edit, Trash2, X, Database } from 'lucide-react';
+import { Loader2, Plus, Edit, Trash2, Database, Users } from 'lucide-react';
 import {
   getAllGameModes,
   addGameMode,
@@ -13,7 +13,7 @@ import {
   addLocationToGameMode,
   updateLocationInGameMode,
   deleteLocationFromGameMode,
-  seedDatabase, // Import the new seed function
+  seedDatabase,
   type GameMode,
   type Location
 } from '@/lib/game-data';
@@ -162,21 +162,15 @@ export default function AdminPage() {
   const [selectedGameModeId, setSelectedGameModeId] = useState<string | null>(null);
   const [isSeeding, setIsSeeding] = useState(false);
 
-
-  const adminUid = process.env.NEXT_PUBLIC_ADMIN_UID;
-
   useEffect(() => {
     if (!authLoading) {
       if (!user) {
         router.push('/login');
-      } else if (user.uid !== adminUid) {
-        toast({ title: 'Access Denied', description: 'You do not have permission to view this page.', variant: 'destructive' });
-        router.push('/');
       } else {
          fetchGameModes();
       }
     }
-  }, [user, authLoading, router, adminUid, toast]);
+  }, [user, authLoading, router]);
 
   const fetchGameModes = async () => {
     setLoading(true);
@@ -250,7 +244,7 @@ export default function AdminPage() {
     }
   };
   
-  if (authLoading || loading || user?.uid !== adminUid) {
+  if (authLoading || loading) {
     return (
       <div className="flex h-screen items-center justify-center">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
@@ -263,15 +257,15 @@ export default function AdminPage() {
       <Card>
         <CardHeader>
           <div className="flex justify-between items-center">
-             <CardTitle>Admin Dashboard</CardTitle>
+             <CardTitle className="flex items-center gap-2"><Users /> Custom Game Modes</CardTitle>
              <div className="flex items-center gap-2">
                 <Button onClick={handleSeedDatabase} variant="outline" disabled={isSeeding}>
-                  { isSeeding ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Database className="mr-2 h-4 w-4" />} Seed Database
+                  { isSeeding ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Database className="mr-2 h-4 w-4" />} Seed Sample Data
                 </Button>
                 <Dialog open={isGameModeFormOpen} onOpenChange={setIsGameModeFormOpen}>
                     <DialogTrigger asChild>
                         <Button onClick={() => { setEditingGameMode(null); setNewGameModeName('');}}>
-                            <Plus className="mr-2 h-4 w-4" /> Add Game Mode
+                            <Plus className="mr-2 h-4 w-4" /> Add New Game Mode
                         </Button>
                     </DialogTrigger>
                     <DialogContent>
@@ -298,7 +292,7 @@ export default function AdminPage() {
              </div>
           </div>
           <CardDescription>
-            Manage game modes and their locations. Click "Seed Database" to add sample data.
+            Create and manage your own custom location lists to play with friends.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -385,3 +379,4 @@ export default function AdminPage() {
     </main>
   );
 }
+
