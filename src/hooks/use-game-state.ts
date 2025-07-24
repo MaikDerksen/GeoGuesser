@@ -346,27 +346,46 @@ export function useGameState(user: User | null, lobbyId: string | null = null) {
   }, [gameState, gameMode, locationLoading, userLocation, locationError, nearMeOptions, isMultiplayer, isHost, lobbyId, user]);
 
 
-  const handleSetGameMode = useCallback(async (mode: GameModeId) => {
-    let finalMode = mode;
-    // Map continent names to game mode names
-    if (mode === 'North America') finalMode = 'USA Landmarks';
-    if (mode === 'South America') finalMode = 'Latin America';
+  const handleSetGameMode = useCallback(async (modeName: string) => {
+    let finalModeId: string | undefined = modeName;
     
-    if(isMultiplayer && lobbyId && isHost) {
-        await updateDoc(doc(db, 'lobbies', lobbyId), { gameMode: finalMode });
+    // If it's a continent, we need to find the corresponding game mode ID
+    const continentMap: { [key: string]: string } = {
+        'North America': 'USA Landmarks',
+        'South America': 'Latin America',
+    };
+    const mappedName = continentMap[modeName] || modeName;
+
+    // Find the mode from the fetched list
+    const selectedMode = gameModes.find(m => m.name === mappedName || m.id === mappedName);
+
+    if (mappedName !== 'NEAR_ME' && !selectedMode) {
+        toast({ title: "Mode Not Found", description: `Could not find a game mode called "${mappedName}".`, variant: "destructive"});
+        return;
     }
-    setGameMode(finalMode);
+
+    finalModeId = mappedName === 'NEAR_ME' ? 'NEAR_ME' : selectedMode?.id;
+    
+    if (!finalModeId) {
+         toast({ title: "Error", description: `Could not resolve ID for game mode "${mappedName}".`, variant: "destructive"});
+        return;
+    }
+
+    if(isMultiplayer && lobbyId && isHost) {
+        await updateDoc(doc(db, 'lobbies', lobbyId), { gameMode: finalModeId });
+    }
+    setGameMode(finalModeId);
     setCurrentRound(0);
     setScore(0);
 
-    if (finalMode === 'NEAR_ME') {
+    if (finalModeId === 'NEAR_ME') {
       setGameState('customizing_near_me');
       return;
     }
     
     prepareGame();
 
-  }, [prepareGame, isMultiplayer, lobbyId, isHost]);
+  }, [prepareGame, isMultiplayer, lobbyId, isHost, gameModes, toast]);
 
   const handleStartNearMe = useCallback(() => {
     prepareGame();
@@ -446,5 +465,3 @@ export function useGameState(user: User | null, lobbyId: string | null = null) {
     lobby,
   };
 }
-
-    
