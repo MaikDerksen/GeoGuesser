@@ -70,6 +70,17 @@ export function useGameState(user: User | null, lobbyId: string | null = null) {
       }
   });
 
+  const resetGame = useCallback(() => {
+    setGameState('idle');
+    setGameMode(null);
+    setCurrentRound(0);
+    setScore(0);
+    setUserGuess(null);
+    setTarget(null);
+    setCurrentLocationSet([]);
+    setGameLoading(false);
+  }, []);
+
    useEffect(() => {
     getGameModes().then(setGameModes).catch(err => {
         console.error("Failed to fetch game modes:", err);
@@ -140,17 +151,6 @@ export function useGameState(user: User | null, lobbyId: string | null = null) {
     if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
       setAppUrl(window.location.origin);
     }
-  }, []);
-
-  const resetGame = useCallback(() => {
-    setGameState('idle');
-    setGameMode(null);
-    setCurrentRound(0);
-    setScore(0);
-    setUserGuess(null);
-    setTarget(null);
-    setCurrentLocationSet([]);
-    setGameLoading(false);
   }, []);
 
   // Memoize heading calculation
