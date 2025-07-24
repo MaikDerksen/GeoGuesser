@@ -24,10 +24,7 @@ const WorldMap: React.FC<WorldMapProps> = ({ onSelectContinent, className }) => 
           maxScale={5}
           centerOnInit
        >
-        <TransformComponent
-          wrapperStyle={{ width: '100%', height: '100%'}}
-          contentStyle={{ width: '100%', height: '100%'}}
-        >
+        <TransformComponent>
           <BasicWorldMap
               primaryColor="hsl(var(--primary))"
               secondaryColor="hsl(var(--muted))"
