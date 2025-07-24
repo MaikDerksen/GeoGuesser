@@ -59,6 +59,7 @@ function HomeComponent() {
 
    const [explorerSearch, setExplorerSearch] = useState('');
    const [isSearching, setIsSearching] = useState(false);
+   const [nextState, setNextState] = useState<string | null>(null);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -68,18 +69,19 @@ function HomeComponent() {
 
 
   const handleModeSelection = (mode: 'single' | 'multiplayer' | 'explorer') => {
-    if(mode === 'multiplayer') {
+    if (mode === 'multiplayer') {
       router.push('/lobby');
-    } else if (mode === 'explorer') {
-        if (permissionState === 'prompt') {
-            setGameState('permission');
-        } else {
-             setGameState('explorer');
-        }
     } else {
-      setGameState('mode_selection');
+      if (permissionState === 'prompt' || (permissionState === 'not-supported' && typeof (DeviceOrientationEvent as any).requestPermission === 'function')) {
+        setNextState(mode === 'single' ? 'mode_selection' : 'explorer');
+        setGameState('permission');
+      } else if (permissionState === 'granted') {
+        setGameState(mode === 'single' ? 'mode_selection' : 'explorer');
+      } else {
+        toast({ title: "Permission Required", description: "Device orientation permission is required. Please enable it in your browser settings.", variant: "destructive"});
+      }
     }
-  }
+  };
 
   const handleExplorerSearch = async (e: FormEvent) => {
     e.preventDefault();
@@ -122,7 +124,7 @@ function HomeComponent() {
                     <CardDescription>GeoCompass needs access to your device's motion and location sensors to work.</CardDescription>
                 </CardHeader>
                 <CardContent>
-                    <Button onClick={handleGrantPermission} size="lg">Grant Permission</Button>
+                    <Button onClick={() => handleGrantPermission(nextState)} size="lg">Grant Permission</Button>
                 </CardContent>
             </Card>
         );
@@ -329,7 +331,7 @@ function HomeComponent() {
             <DialogContent className="sm:max-w-md">
               <DialogHeader>
                 <DialogTitle>Scan to play on your phone</DialogTitle>
-              </DialogHeader>
+              </Header>
               <div className="flex items-center justify-center p-4">
                 <QRCode value={appUrl} size={256} />
               </div>
@@ -349,4 +351,6 @@ export default function Home() {
     </Suspense>
   )
 }
+    
+
     

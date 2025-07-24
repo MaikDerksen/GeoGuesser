@@ -365,26 +365,13 @@ export function useGameState(user: User | null, lobbyId: string | null = null) {
       return;
     }
     
-    if (permissionState === 'prompt' || (permissionState === 'not-supported' && typeof (DeviceOrientationEvent as any).requestPermission === 'function')) {
-      setGameState('permission');
-    } else if (permissionState === 'granted') {
-      prepareGame();
-    } else {
-      toast({ title: "Permission Required", description: "Device orientation permission is required to play. Please enable it in your browser settings.", variant: "destructive"});
-      setGameState('idle');
-    }
-  }, [permissionState, toast, prepareGame, isMultiplayer, lobbyId, isHost]);
+    prepareGame();
+
+  }, [prepareGame, isMultiplayer, lobbyId, isHost]);
 
   const handleStartNearMe = useCallback(() => {
-     if (permissionState === 'prompt' || (permissionState === 'not-supported' && typeof (DeviceOrientationEvent as any).requestPermission === 'function')) {
-      setGameState('permission');
-    } else if (permissionState === 'granted') {
-      prepareGame();
-    } else {
-      toast({ title: "Permission Required", description: "Device orientation permission is required to play. Please enable it in your browser settings.", variant: "destructive"});
-      setGameState('idle');
-    }
-  }, [permissionState, prepareGame, toast]);
+    prepareGame();
+  }, [prepareGame]);
 
   const handleStart = useCallback(async () => {
     if (gameState === 'results') {
@@ -399,10 +386,12 @@ export function useGameState(user: User | null, lobbyId: string | null = null) {
     }
   }, [gameState, currentRound, totalRounds, startNewRound, resetGame, isHost, lobbyId]);
 
-  const handleGrantPermission = async () => {
+  const handleGrantPermission = async (nextState?: string | null) => {
     const status = await requestPermission();
     if (status === 'granted') {
-        if (gameState === 'permission' && (gameMode || lobbyId)) { // If we were waiting for permission for a game
+        if (nextState) {
+            setGameState(nextState as GameState);
+        } else if (gameState === 'permission' && (gameMode || lobbyId)) { // If we were waiting for permission for a game
              prepareGame();
         } else { // If we just needed it for explorer mode
             setGameState('explorer');
@@ -451,3 +440,5 @@ export function useGameState(user: User | null, lobbyId: string | null = null) {
     lobby,
   };
 }
+
+    
