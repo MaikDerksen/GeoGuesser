@@ -1,7 +1,7 @@
 
 "use client";
 
-import { Suspense, useEffect, useState, FormEvent, useCallback } from 'react';
+import React, { Suspense, useEffect, useState, FormEvent, useCallback } from 'react';
 import Compass from '@/components/compass';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -30,7 +30,6 @@ const ExplorerSearch = ({ onTargetSelect }: { onTargetSelect: (target: Location 
     const [predictions, setPredictions] = useState<GetAddressPredictionsOutput>([]);
     const [isPredictionsOpen, setIsPredictionsOpen] = useState(false);
     const { toast } = useToast();
-    const triggerRef = React.useRef<HTMLButtonElement>(null);
     const inputRef = React.useRef<HTMLInputElement>(null);
 
     const handleExplorerSearchChange = async (value: string) => {
@@ -449,5 +448,6 @@ export default function Home() {
 
 
     
+
 
 
