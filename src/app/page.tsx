@@ -154,7 +154,7 @@ function HomeComponent() {
         setPredictions([]);
         setIsPredictionsOpen(false);
     }
-  }, [explorerSearch, predictions, toast]);
+  }, [explorerSearch, predictions, toast, handlePredictionSelect]);
 
 
   const renderContent = () => {
@@ -185,30 +185,31 @@ function HomeComponent() {
         return (
           <div className="flex flex-col items-center gap-6 w-full max-w-md">
              <h2 className="text-3xl font-bold flex items-center gap-2"><Rocket className="h-8 w-8 text-primary"/> Explorer Mode</h2>
-             <Popover open={isPredictionsOpen} onOpenChange={setIsPredictionsOpen}>
-                 <PopoverTrigger asChild>
-                    <form onSubmit={handleExplorerSearch} className="w-full flex gap-2">
-                        <Input 
-                            placeholder="Enter an address or landmark..."
-                            value={explorerSearch}
-                            onChange={(e) => handleExplorerSearchChange(e.target.value)}
-                            onFocus={() => predictions.length > 0 && setIsPredictionsOpen(true)}
-                        />
-                        <Button type="submit" disabled={isSearching} size="icon">
-                           {isSearching && !isPredictionsOpen ? <Loader2 className="animate-spin" /> : <Search />}
-                        </Button>
-                    </form>
-                 </PopoverTrigger>
-                 <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
-                    {isSearching && predictions.length === 0 && <div className="p-4 text-sm text-center">Searching...</div>}
-                    {predictions.map((p) => (
-                        <div key={p.place_id} 
-                             className="p-2 hover:bg-accent cursor-pointer" 
-                             onClick={() => handlePredictionSelect(p)}>
-                            {p.description}
-                        </div>
-                    ))}
-                 </PopoverContent>
+            <Popover open={isPredictionsOpen} onOpenChange={setIsPredictionsOpen}>
+              <PopoverTrigger asChild>
+                <form onSubmit={handleExplorerSearch} className="w-full flex gap-2">
+                    <Input 
+                        placeholder="Enter an address or landmark..."
+                        value={explorerSearch}
+                        onChange={(e) => handleExplorerSearchChange(e.target.value)}
+                        onFocus={() => predictions.length > 0 && setIsPredictionsOpen(true)}
+                        autoComplete="off"
+                    />
+                    <Button type="submit" disabled={isSearching && !isPredictionsOpen} size="icon">
+                       {isSearching && !isPredictionsOpen ? <Loader2 className="animate-spin" /> : <Search />}
+                    </Button>
+                </form>
+              </PopoverTrigger>
+              <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+                {isSearching && predictions.length === 0 && <div className="p-4 text-sm text-center">Searching...</div>}
+                {predictions.map((p) => (
+                    <div key={p.place_id} 
+                          className="p-2 hover:bg-accent cursor-pointer" 
+                          onClick={() => handlePredictionSelect(p)}>
+                        {p.description}
+                    </div>
+                ))}
+              </PopoverContent>
             </Popover>
              <Compass 
                 heading={heading} 
@@ -425,3 +426,6 @@ export default function Home() {
 
 
 
+
+
+    
