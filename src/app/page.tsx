@@ -5,7 +5,7 @@ import React, { Suspense, useEffect, useState, FormEvent, useCallback } from 're
 import Compass from '@/components/compass';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Loader2, Compass as CompassIcon, QrCode, LogOut, Users, Play, Pin, Settings, Search, Rocket, Globe, PencilRuler } from 'lucide-react';
+import { Loader2, Compass as CompassIcon, QrCode, LogOut, Users, Play, Pin, Settings, Search, Rocket, Globe, PencilRuler, Plus } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import QRCode from "qrcode.react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
@@ -100,12 +100,12 @@ const ExplorerSearch = ({ onTargetSelect }: { onTargetSelect: (target: Location 
             }
         }
     };
-
+    
     return (
-        <Popover open={isPredictionsOpen} onOpenChange={setIsPredictionsOpen}>
-            <form onSubmit={handleFormSubmit} className="w-full flex gap-2 items-start">
+         <form onSubmit={handleFormSubmit} className="w-full flex gap-2 items-start">
+            <Popover open={isPredictionsOpen} onOpenChange={setIsPredictionsOpen}>
                 <PopoverTrigger asChild>
-                    <div className="w-full relative">
+                     <div className="w-full relative">
                          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
                          <Input
                             ref={inputRef}
@@ -118,27 +118,26 @@ const ExplorerSearch = ({ onTargetSelect }: { onTargetSelect: (target: Location 
                         />
                     </div>
                 </PopoverTrigger>
-                <Button type="submit" size="icon" disabled={isSearching}>
-                    {isSearching ? <Loader2 className="animate-spin" /> : <Search />}
-                </Button>
-            </form>
-
-            <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start"
-                onOpenAutoFocus={(e) => e.preventDefault()} // prevent focus stealing
-            >
-                {isSearching && predictions.length === 0 && <div className="p-4 text-sm text-center">Searching...</div>}
-                {predictions.map((p) => (
-                    <div key={p.place_id}
-                        className="p-2 hover:bg-accent cursor-pointer text-sm"
-                        onMouseDown={(e) => {
-                            e.preventDefault();
-                            handlePredictionSelect(p);
-                        }}>
-                        {p.description}
-                    </div>
-                ))}
-            </PopoverContent>
-        </Popover>
+                <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start"
+                    onOpenAutoFocus={(e) => e.preventDefault()} // prevent focus stealing
+                >
+                    {isSearching && predictions.length === 0 && <div className="p-4 text-sm text-center">Searching...</div>}
+                    {predictions.map((p) => (
+                        <div key={p.place_id}
+                            className="p-2 hover:bg-accent cursor-pointer text-sm"
+                            onMouseDown={(e) => {
+                                e.preventDefault();
+                                handlePredictionSelect(p);
+                            }}>
+                            {p.description}
+                        </div>
+                    ))}
+                </PopoverContent>
+            </Popover>
+             <Button type="submit" size="icon" disabled={isSearching}>
+                {isSearching ? <Loader2 className="animate-spin" /> : <Search />}
+            </Button>
+        </form>
     );
 };
 
@@ -167,6 +166,7 @@ function HomeComponent() {
     gameModes,
     handleSetGameMode,
     handleStart,
+    handleGuess,
     handleGrantPermission,
     permissionState,
     resetGame,
@@ -235,6 +235,7 @@ function HomeComponent() {
              <ExplorerSearch onTargetSelect={setTarget} />
              <Compass 
                 heading={heading} 
+                onGuess={() => {}}
                 gameState={gameState}
                 targetAngle={targetBearing}
              />
@@ -487,6 +488,7 @@ export default function Home() {
 
 
     
+
 
 
 
