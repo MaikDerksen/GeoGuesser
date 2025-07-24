@@ -86,7 +86,8 @@ export function useGameState(user: User | null, lobbyId: string | null = null) {
 
    useEffect(() => {
     if (!lobbyId) {
-        if(gameState !== 'explorer') {
+        // If not in a multiplayer lobby, ensure we aren't stuck in a game state
+        if (['playing', 'results', 'loading_location'].includes(gameState)) {
           setGameState('idle');
         }
         return;
@@ -124,7 +125,7 @@ export function useGameState(user: User | null, lobbyId: string | null = null) {
     });
 
     return () => unsub();
-  }, [lobbyId, toast, gameState]);
+  }, [lobbyId, toast, gameState, resetGame]);
 
   const totalRounds = useMemo(() => {
     if (gameMode === 'NEAR_ME') {
@@ -249,7 +250,7 @@ export function useGameState(user: User | null, lobbyId: string | null = null) {
         setGameLoading(false);
     }
     
-  }, [currentLocationSet, resetGame, toast, isMultiplayer, lobbyId, isHost, currentRound]);
+  }, [currentLocationSet, resetGame, toast, isHost, currentRound, isMultiplayer, lobbyId]);
 
 
   const prepareGame = useCallback(async () => {
@@ -440,5 +441,3 @@ export function useGameState(user: User | null, lobbyId: string | null = null) {
     lobby,
   };
 }
-
-    
