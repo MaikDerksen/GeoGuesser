@@ -22,7 +22,6 @@ const WorldMap: React.FC<WorldMapProps> = ({ onSelectContinent, className }) => 
           initialScale={1}
           minScale={0.8}
           maxScale={5}
-          centerOnInit
        >
         <TransformComponent>
           <BasicWorldMap
