@@ -1,38 +1,28 @@
+
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Allow read access to game modes for all users
+    // Allow public read access to game modes, but only admins can write.
     match /game_modes/{gameModeId} {
       allow read: if true;
-      allow write: if false; // Only allow writes from admin page logic for now
-      
+      allow write: if request.auth != null && request.auth.uid == "s5bYTf3cR2gJgQ8f3b2a5V7Y8H9j"; // Placeholder for admin UID logic
+
+      // Allow anyone to write to the NEAR_ME logs subcollection
       match /logs/{logId} {
-         allow write: if request.auth != null;
-         allow read: if false;
+        allow read, write: if true;
       }
     }
-    
-    // Lock down user data
-    match /users/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
-    }
 
-    // Allow logged-in users to interact with lobbies
+    // Allow anyone to read and write to lobbies for multiplayer functionality
     match /lobbies/{lobbyId} {
-      allow read, write: if request.auth != null;
+      allow read, write: if true;
     }
     
-    // Allow logged-in users to write to their own logs
-    match /near_me_logs/{logId} {
-       allow read: if false; // No one should read these directly
-       allow create: if request.auth != null;
-    }
-
-    // Allow reading from and writing to the location cache
+    // Allow anyone to read and write to the location cache
     match /location_cache/{cacheId} {
-        allow read, write: if request.auth != null;
+        allow read, write: if true;
     }
   }
 }
