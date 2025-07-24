@@ -31,6 +31,7 @@ const PlaceSchema = z.object({
 
 const PlacesApiResponseSchema = z.object({
   places: z.array(PlaceSchema).optional(),
+  nextPageToken: z.string().optional(),
 });
 
 // Define the schema for the AI's input, which includes the raw places data
@@ -96,8 +97,9 @@ const getNearbyLocationsFlow = ai.defineFlow(
     },
     async (input) => {
         let placesFromApi: Location[] = [];
-        let rawApiResponse: any = { source: 'cache' };
+        let rawApiResponse: any = { source: 'cache', pages: [] };
         const searchRadiusMeters = input.radius * 1000;
+        const MAX_PAGES = 3; // Safety cap to avoid excessive API calls
 
         // 1. Check for a cached set of locations first
         const cachedData = await findLocationCache(input.latitude, input.longitude, searchRadiusMeters);
@@ -109,53 +111,80 @@ const getNearbyLocationsFlow = ai.defineFlow(
 
         } else {
              console.log("Cache miss. Calling Google Places API.");
-            // 2. If no cache, call Google Places API
+            // 2. If no cache, call Google Places API with pagination
             const apiKey = process.env.GOOGLE_PLACES_KEY;
             if (!apiKey) {
                 throw new Error("Google Places API key is missing. Please set GOOGLE_PLACES_KEY in your .env file.");
             }
 
-            const placesResponse = await fetch('https://places.googleapis.com/v1/places:searchNearby', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-Goog-Api-Key': apiKey,
-                    'X-Goog-FieldMask': 'places.displayName,places.location',
-                },
-                body: JSON.stringify({
-                    includedTypes: input.categories,
-                    maxResultCount: 20, // Fetch a good number for the cache and curation
-                    locationRestriction: {
-                        circle: {
-                            center: {
-                                latitude: input.latitude,
-                                longitude: input.longitude,
-                            },
-                            radius: searchRadiusMeters,
+            let currentPage = 0;
+            let nextPageToken: string | undefined = undefined;
+
+            const requestBody: any = {
+                includedTypes: input.categories,
+                maxResultCount: 20, // Max per page
+                locationRestriction: {
+                    circle: {
+                        center: {
+                            latitude: input.latitude,
+                            longitude: input.longitude,
                         },
+                        radius: searchRadiusMeters,
                     },
-                }),
-            });
+                },
+            };
 
-            if (!placesResponse.ok) {
-                const errorBody = await placesResponse.text();
-                throw new Error(`Failed to fetch from Places API: ${placesResponse.statusText} - ${errorBody}`);
-            }
+            do {
+                currentPage++;
+                if (nextPageToken) {
+                    requestBody.pageToken = nextPageToken;
+                }
 
-            rawApiResponse = await placesResponse.json();
-            const parsedPlaces = PlacesApiResponseSchema.parse(rawApiResponse);
+                const placesResponse = await fetch('https://places.googleapis.com/v1/places:searchNearby', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Goog-Api-Key': apiKey,
+                        'X-Goog-FieldMask': 'places.displayName,places.location,nextPageToken',
+                    },
+                    body: JSON.stringify(requestBody),
+                });
 
-            if (!parsedPlaces.places || parsedPlaces.places.length === 0) {
+                if (!placesResponse.ok) {
+                    const errorBody = await placesResponse.text();
+                    throw new Error(`Failed to fetch from Places API (Page ${currentPage}): ${placesResponse.statusText} - ${errorBody}`);
+                }
+
+                const pageData = await placesResponse.json();
+                rawApiResponse.pages.push(pageData); // Store raw response for each page
+                const parsedPage = PlacesApiResponseSchema.parse(pageData);
+                
+                if (parsedPage.places && parsedPage.places.length > 0) {
+                     const pageLocations = parsedPage.places.map(p => ({
+                        name: p.displayName.text,
+                        coordinates: {
+                            latitude: p.location.latitude,
+                            longitude: p.location.longitude
+                        }
+                    }));
+                    placesFromApi.push(...pageLocations);
+                }
+                
+                nextPageToken = parsedPage.nextPageToken;
+
+                // Wait briefly before fetching the next page as recommended by Google
+                if (nextPageToken) {
+                    await new Promise(resolve => setTimeout(resolve, 2000));
+                }
+
+            } while (nextPageToken && currentPage < MAX_PAGES);
+            
+            console.log(`Fetched a total of ${placesFromApi.length} locations over ${currentPage} page(s).`);
+
+
+            if (placesFromApi.length === 0) {
                 return { curatedLocations: [], rawApiResponse };
             }
-
-            placesFromApi = parsedPlaces.places.map(p => ({
-                name: p.displayName.text,
-                coordinates: {
-                    latitude: p.location.latitude,
-                    longitude: p.location.longitude
-                }
-            }));
 
             // 3. Save the new results to the cache
             if(placesFromApi.length > 0) {
