@@ -269,7 +269,7 @@ function HomeComponent() {
         );
       case 'continent_selection':
         return (
-             <Card className="text-center max-w-4xl w-full">
+             <Card className="text-center max-w-4xl w-full sm:border sm:bg-card">
                  <CardHeader>
                     <CardTitle>Select a Continent</CardTitle>
                     <CardDescription>Click on a continent on the map to start a game with landmarks from that region.</CardDescription>
@@ -488,6 +488,7 @@ export default function Home() {
 
 
     
+
 
 
 

@@ -16,7 +16,7 @@ const WorldMap: React.FC<WorldMapProps> = ({ onSelectContinent, className }) => 
   };
 
   return (
-    <div className={cn("relative w-full max-w-4xl mx-auto p-4", className)}>
+    <div className={cn("relative w-full max-w-4xl mx-auto p-0 sm:p-4", className)}>
        <BasicWorldMap
             primaryColor="hsl(var(--primary))"
             secondaryColor="hsl(var(--muted))"
