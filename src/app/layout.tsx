@@ -25,7 +25,6 @@ export default function RootLayout({
       <body className="font-body antialiased">
         <header className="absolute top-0 left-0 p-4">
             <Button asChild variant="link"><Link href="/">Home</Link></Button>
-            <Button asChild variant="link"><Link href="/admin">Custom Games</Link></Button>
         </header>
         {children}
         <Toaster />
