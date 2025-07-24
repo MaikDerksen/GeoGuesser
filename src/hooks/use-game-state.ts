@@ -347,14 +347,19 @@ export function useGameState(user: User | null, lobbyId: string | null = null) {
 
 
   const handleSetGameMode = useCallback(async (mode: GameModeId) => {
+    let finalMode = mode;
+    // Map continent names to game mode names
+    if (mode === 'North America') finalMode = 'USA Landmarks';
+    if (mode === 'South America') finalMode = 'Latin America';
+    
     if(isMultiplayer && lobbyId && isHost) {
-        await updateDoc(doc(db, 'lobbies', lobbyId), { gameMode: mode });
+        await updateDoc(doc(db, 'lobbies', lobbyId), { gameMode: finalMode });
     }
-    setGameMode(mode);
+    setGameMode(finalMode);
     setCurrentRound(0);
     setScore(0);
 
-    if (mode === 'NEAR_ME') {
+    if (finalMode === 'NEAR_ME') {
       setGameState('customizing_near_me');
       return;
     }
@@ -405,7 +410,7 @@ export function useGameState(user: User | null, lobbyId: string | null = null) {
   }, [user, resetGame]);
 
   useEffect(() => {
-    if (!isMultiplayer && gameState !== 'idle' && gameState !== 'permission' && gameState !== 'explorer' && gameState !== 'mode_selection' && gameState !== 'customizing_near_me' && gameState !== 'continent_selection' && gameState !== 'custom_game_list' && !gameMode) {
+    if (!isMultiplayer && (gameState === 'playing' || gameState === 'results' || gameState === 'loading_location') && !gameMode) {
         resetGame();
     }
   }, [isMultiplayer, gameState, gameMode, resetGame]);
@@ -441,3 +446,5 @@ export function useGameState(user: User | null, lobbyId: string | null = null) {
     lobby,
   };
 }
+
+    
