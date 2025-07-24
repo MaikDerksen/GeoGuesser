@@ -16,11 +16,131 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
-import type { GameMode } from '@/lib/game-data';
+import type { GameMode, Location } from '@/lib/game-data';
 import { Input } from '@/components/ui/input';
 import { getCoordinatesForAddress } from '@/ai/flows/get-coordinates-for-address';
 import { getAddressPredictions, type GetAddressPredictionsOutput } from '@/ai/flows/get-address-predictions';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+
+
+// Self-contained component for the Explorer search functionality to prevent focus loss
+const ExplorerSearch = ({ onTargetSelect }: { onTargetSelect: (target: Location | null) => void }) => {
+    const [explorerSearch, setExplorerSearch] = useState('');
+    const [isSearching, setIsSearching] = useState(false);
+    const [predictions, setPredictions] = useState<GetAddressPredictionsOutput>([]);
+    const [isPredictionsOpen, setIsPredictionsOpen] = useState(false);
+    const { toast } = useToast();
+    const triggerRef = React.useRef<HTMLButtonElement>(null);
+    const inputRef = React.useRef<HTMLInputElement>(null);
+
+    const handleExplorerSearchChange = async (value: string) => {
+        setExplorerSearch(value);
+        if (value.length > 2) {
+            if (!isPredictionsOpen) setIsPredictionsOpen(true);
+            setIsSearching(true);
+            try {
+                const preds = await getAddressPredictions(value);
+                setPredictions(preds);
+            } catch (err: any) {
+                toast({ title: 'Autocomplete Error', description: `Failed to get suggestions: ${err.message}`, variant: 'destructive' });
+            } finally {
+                setIsSearching(false);
+            }
+        } else {
+            setPredictions([]);
+            if (isPredictionsOpen) setIsPredictionsOpen(false);
+        }
+    };
+
+    const handlePredictionSelect = async (prediction: GetAddressPredictionsOutput[0]) => {
+        setExplorerSearch(prediction.description);
+        setPredictions([]);
+        setIsPredictionsOpen(false);
+        setIsSearching(true);
+        try {
+            const coords = await getCoordinatesForAddress({ placeId: prediction.place_id });
+            if (coords) {
+                onTargetSelect({ name: prediction.description.split(',')[0], coordinates: coords });
+            } else {
+                toast({ title: 'Not Found', description: `Could not find coordinates for "${prediction.description}"`, variant: 'destructive' });
+                onTargetSelect(null);
+            }
+        } catch (err: any) {
+            toast({ title: 'Error', description: `Failed to search: ${err.message}`, variant: 'destructive' });
+            onTargetSelect(null);
+        } finally {
+            setIsSearching(false);
+        }
+    };
+
+    const handleFormSubmit = async (e: FormEvent) => {
+        e.preventDefault();
+        inputRef.current?.blur(); // Close keyboard on mobile
+        setIsPredictionsOpen(false);
+
+        if (!explorerSearch) return;
+
+        if (predictions.length > 0) {
+            await handlePredictionSelect(predictions[0]);
+        } else {
+            setIsSearching(true);
+            try {
+                const coords = await getCoordinatesForAddress({ address: explorerSearch });
+                if (coords) {
+                    onTargetSelect({ name: explorerSearch, coordinates: coords });
+                } else {
+                    toast({ title: 'Not Found', description: `Could not find coordinates for "${explorerSearch}"`, variant: 'destructive' });
+                    onTargetSelect(null);
+                }
+            } catch (err: any) {
+                toast({ title: 'Error', description: `Failed to search: ${err.message}`, variant: 'destructive' });
+                onTargetSelect(null);
+            } finally {
+                setIsSearching(false);
+            }
+        }
+    };
+
+    return (
+        <Popover open={isPredictionsOpen} onOpenChange={setIsPredictionsOpen}>
+            <form onSubmit={handleFormSubmit} className="w-full flex gap-2 items-start">
+                <PopoverTrigger asChild>
+                    <div className="w-full relative">
+                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                         <Input
+                            ref={inputRef}
+                            placeholder="Enter an address or landmark..."
+                            value={explorerSearch}
+                            onChange={(e) => handleExplorerSearchChange(e.target.value)}
+                            onFocus={() => { if (predictions.length > 0) setIsPredictionsOpen(true); }}
+                            autoComplete="off"
+                            className="pl-10"
+                        />
+                    </div>
+                </PopoverTrigger>
+                <Button type="submit" size="icon" disabled={isSearching}>
+                    {isSearching ? <Loader2 className="animate-spin" /> : <Search />}
+                </Button>
+            </form>
+
+            <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start"
+                onOpenAutoFocus={(e) => e.preventDefault()} // prevent focus stealing
+            >
+                {isSearching && predictions.length === 0 && <div className="p-4 text-sm text-center">Searching...</div>}
+                {predictions.map((p) => (
+                    <div key={p.place_id}
+                        className="p-2 hover:bg-accent cursor-pointer text-sm"
+                        onMouseDown={(e) => {
+                            e.preventDefault();
+                            handlePredictionSelect(p);
+                        }}>
+                        {p.description}
+                    </div>
+                ))}
+            </PopoverContent>
+        </Popover>
+    );
+};
 
 
 function HomeComponent() {
@@ -60,13 +180,8 @@ function HomeComponent() {
     lobby,
   } = useGameState(user, lobbyId);
 
-   const [explorerSearch, setExplorerSearch] = useState('');
-   const [isSearching, setIsSearching] = useState(false);
    const [nextState, setNextState] = useState<string | null>(null);
-   const [predictions, setPredictions] = useState<GetAddressPredictionsOutput>([]);
-   const [isPredictionsOpen, setIsPredictionsOpen] = useState(false);
-
-
+  
   useEffect(() => {
     if (!authLoading && !user) {
       router.push('/login');
@@ -87,83 +202,6 @@ function HomeComponent() {
     }
   };
   
-  const handleExplorerSearchChange = async (value: string) => {
-      setExplorerSearch(value);
-      if (value.length > 2) {
-          setIsSearching(true);
-          try {
-              const preds = await getAddressPredictions(value);
-              setPredictions(preds);
-              if (preds.length > 0) setIsPredictionsOpen(true);
-              else setIsPredictionsOpen(false);
-          } catch(err: any) {
-              toast({ title: 'Autocomplete Error', description: `Failed to get suggestions: ${err.message}`, variant: 'destructive'});
-          } finally {
-              setIsSearching(false);
-          }
-      } else {
-          setPredictions([]);
-          setIsPredictionsOpen(false);
-      }
-  }
-
-  const handlePredictionSelect = async (prediction: GetAddressPredictionsOutput[0]) => {
-      setExplorerSearch(prediction.description);
-      setPredictions([]);
-      setIsPredictionsOpen(false);
-      setIsSearching(true);
-      try {
-        const coords = await getCoordinatesForAddress({ placeId: prediction.place_id });
-        if(coords) {
-            setTarget({ name: prediction.description.split(',')[0], coordinates: coords });
-        } else {
-            toast({ title: 'Not Found', description: `Could not find coordinates for "${prediction.description}"`, variant: 'destructive'});
-            setTarget(null);
-        }
-    } catch(err: any) {
-        toast({ title: 'Error', description: `Failed to search: ${err.message}`, variant: 'destructive'});
-        setTarget(null);
-    } finally {
-        setIsSearching(false);
-    }
-  }
-
-  const handleExplorerSearch = useCallback(async (e: FormEvent) => {
-    e.preventDefault();
-    if (!explorerSearch) return;
-    
-    setIsPredictionsOpen(false);
-
-    // In case the user just hits enter on a non-suggested search
-    if (predictions.length > 0 && predictions.find(p => p.description === explorerSearch)) {
-         // A prediction was selected, do nothing, handlePredictionSelect already handled it
-    } else if (predictions.length > 0) {
-        // User typed something and hit enter without selecting, use the top suggestion
-        handlePredictionSelect(predictions[0]);
-        return;
-    }
-    
-    // No predictions available, search directly
-    setIsSearching(true);
-    try {
-        const coords = await getCoordinatesForAddress({ address: explorerSearch });
-        if(coords) {
-            setTarget({ name: explorerSearch, coordinates: coords });
-        } else {
-            toast({ title: 'Not Found', description: `Could not find coordinates for "${explorerSearch}"`, variant: 'destructive'});
-            setTarget(null);
-        }
-    } catch(err: any) {
-        toast({ title: 'Error', description: `Failed to search: ${err.message}`, variant: 'destructive'});
-        setTarget(null);
-    } finally {
-        setIsSearching(false);
-        setPredictions([]);
-        setIsPredictionsOpen(false);
-    }
-  }, [explorerSearch, predictions, toast, handlePredictionSelect]);
-
-
   const renderContent = () => {
     if (authLoading || !user) {
       return (
@@ -192,34 +230,7 @@ function HomeComponent() {
         return (
           <div className="flex flex-col items-center gap-6 w-full max-w-md">
              <h2 className="text-3xl font-bold flex items-center gap-2"><Rocket className="h-8 w-8 text-primary"/> Explorer Mode</h2>
-              <form onSubmit={handleExplorerSearch} className="w-full flex gap-2 items-start">
-                  <Popover open={isPredictionsOpen} onOpenChange={setIsPredictionsOpen}>
-                      <PopoverTrigger asChild>
-                          <div className="w-full relative">
-                              <Input 
-                                  placeholder="Enter an address or landmark..."
-                                  value={explorerSearch}
-                                  onChange={(e) => handleExplorerSearchChange(e.target.value)}
-                                  onFocus={() => predictions.length > 0 && setIsPredictionsOpen(true)}
-                                  autoComplete="off"
-                              />
-                          </div>
-                      </PopoverTrigger>
-                       <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
-                          {isSearching && predictions.length === 0 && <div className="p-4 text-sm text-center">Searching...</div>}
-                          {predictions.map((p) => (
-                              <div key={p.place_id} 
-                                    className="p-2 hover:bg-accent cursor-pointer" 
-                                    onMouseDown={(e) => { e.preventDefault(); handlePredictionSelect(p); }}>
-                                  {p.description}
-                              </div>
-                          ))}
-                      </PopoverContent>
-                  </Popover>
-                  <Button type="submit" disabled={isSearching} size="icon">
-                      {isSearching ? <Loader2 className="animate-spin" /> : <Search />}
-                  </Button>
-              </form>
+             <ExplorerSearch onTargetSelect={setTarget} />
              <Compass 
                 heading={heading} 
                 gameState={gameState}
@@ -438,4 +449,5 @@ export default function Home() {
 
 
     
+
 
