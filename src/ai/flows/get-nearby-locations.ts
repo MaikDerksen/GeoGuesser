@@ -97,7 +97,7 @@ const getNearbyLocationsFlow = ai.defineFlow(
     },
     async (input) => {
         let placesFromApi: Location[] = [];
-        let rawApiResponse: any = { source: 'cache', pages: [] };
+        let rawApiResponse: any = { source: 'API', pages: [] }; // Default to API source
         const searchRadiusMeters = input.radius * 1000;
         const MAX_PAGES = 3; // Safety cap to avoid excessive API calls
 
@@ -107,7 +107,15 @@ const getNearbyLocationsFlow = ai.defineFlow(
         if (cachedData && cachedData.locations.length >= input.count) {
              console.log(`Cache hit! Using ${cachedData.locations.length} locations from cache ID ${cachedData.id}`);
              placesFromApi = cachedData.locations;
+             rawApiResponse.source = 'cache';
              rawApiResponse.cacheId = cachedData.id;
+             // Convert cached locations to a format similar to the API response for consistent logging
+             const cachedPlaces = cachedData.locations.map(loc => ({
+                displayName: { text: loc.name },
+                location: { latitude: loc.coordinates.latitude, longitude: loc.coordinates.longitude }
+             }));
+             rawApiResponse.pages.push({ places: cachedPlaces });
+
 
         } else {
              console.log("Cache miss. Calling Google Places API.");
