@@ -429,7 +429,6 @@ function HomeComponent() {
                <Button onClick={() => handleModeSelection('single')} size="lg"><Play /> Single Player</Button>
                <Button onClick={() => handleModeSelection('multiplayer')} size="lg"><Users /> Multiplayer</Button>
                <Button onClick={() => handleModeSelection('explorer')} size="lg" variant="outline"><Rocket /> Explorer Mode</Button>
-               <Button onClick={() => handleModeSelection('custom_game_list')} size="lg" variant="outline"><PencilRuler /> Custom Games</Button>
             </CardContent>
           </Card>
         );
