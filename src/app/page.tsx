@@ -191,15 +191,15 @@ function HomeComponent() {
   const handleModeSelection = (mode: 'single' | 'multiplayer' | 'explorer' | 'custom_game_list') => {
     if (mode === 'multiplayer') {
       router.push('/lobby');
+    } else if (mode === 'custom_game_list') {
+        router.push('/custom');
     } else {
-       if (permissionState !== 'granted' && (mode !== 'custom_game_list')) {
+       if (permissionState !== 'granted') {
           setNextState(mode === 'single' ? 'mode_selection' : 'explorer');
           setGameState('permission');
        } else {
          if (mode === 'single') setGameState('mode_selection');
          else if (mode === 'explorer') setGameState('explorer');
-         else if (mode === 'custom_game_list') router.push('/admin');
-
        }
     }
   };
@@ -268,7 +268,7 @@ function HomeComponent() {
             </Card>
         );
       case 'continent_selection':
-        return (
+         return (
             <div className="flex flex-col items-center justify-center w-full h-full text-center p-4">
                  <div className="mb-4">
                     <h1 className="text-3xl font-bold">Select a Continent</h1>
@@ -289,9 +289,10 @@ function HomeComponent() {
                     {gameModes.map((mode: GameMode) => (
                         <Button key={mode.id} onClick={() => handleSetGameMode(mode.id)} size="lg" disabled={isMultiplayer && !isHost}>{mode.name}</Button>
                     ))}
+                     {gameModes.length === 0 && <p className="col-span-2 text-muted-foreground">You have not created any custom games yet.</p>}
                 </CardContent>
                  <CardContent className="mt-4">
-                    <Button onClick={() => router.push('/admin')} disabled={isMultiplayer && !isHost}><Plus className="mr-2"/> Create New List</Button>
+                    <Button onClick={() => router.push('/custom')} disabled={isMultiplayer && !isHost}><Plus className="mr-2"/> Create New List</Button>
                     <div className="mt-2">
                         <Button variant="link" onClick={() => setGameState('mode_selection')} disabled={isMultiplayer && !isHost}>Back</Button>
                     </div>
@@ -428,6 +429,7 @@ function HomeComponent() {
                <Button onClick={() => handleModeSelection('single')} size="lg"><Play /> Single Player</Button>
                <Button onClick={() => handleModeSelection('multiplayer')} size="lg"><Users /> Multiplayer</Button>
                <Button onClick={() => handleModeSelection('explorer')} size="lg" variant="outline"><Rocket /> Explorer Mode</Button>
+               <Button onClick={() => handleModeSelection('custom_game_list')} size="lg" variant="outline"><PencilRuler /> Custom Games</Button>
             </CardContent>
           </Card>
         );
@@ -477,21 +479,3 @@ export default function Home() {
     </Suspense>
   )
 }
-    
-
-    
-
-
-
-
-
-    
-
-
-
-
-
-
-
-
-
