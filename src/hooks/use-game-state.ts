@@ -97,9 +97,11 @@ export function useGameState(user: User | null, lobbyId: string | null = null) {
 
    useEffect(() => {
     if (!lobbyId) {
-        // If not in a multiplayer lobby, ensure we aren't stuck in a game state
-        if (['playing', 'results', 'loading_location'].includes(gameState)) {
-          setGameState('idle');
+        // If not in a multiplayer lobby, ensure we aren't stuck in a game state that requires a lobby
+        if (lobby) setLobby(null);
+        if (gameState !== 'idle' && gameState !== 'mode_selection' && gameState !== 'explorer' && gameState !== 'customizing_near_me' && gameState !== 'permission' && !gameMode) {
+            // If we are in a game state without a game mode (and not in a lobby), something is wrong. Reset.
+            // But allow being in mode_selection etc.
         }
         return;
     }
@@ -126,7 +128,6 @@ export function useGameState(user: User | null, lobbyId: string | null = null) {
             } else if (lobbyData.status === 'finished') {
                 toast({title: "Game Over", description: "The host has ended the game."});
                 resetGame();
-                // Consider navigating away
             }
 
         } else {
@@ -136,7 +137,7 @@ export function useGameState(user: User | null, lobbyId: string | null = null) {
     });
 
     return () => unsub();
-  }, [lobbyId, toast, gameState, resetGame]);
+  }, [lobbyId, toast, resetGame]);
 
   const totalRounds = useMemo(() => {
     if (gameMode === 'NEAR_ME') {
@@ -230,7 +231,7 @@ export function useGameState(user: User | null, lobbyId: string | null = null) {
     const locationSet = locations || currentLocationSet;
     if(locationSet.length === 0) {
         toast({ title: "No Locations", description: "Could not find any locations for the selected game mode.", variant: "destructive"});
-        if (isHost) resetGame();
+        if (isHost || !isMultiplayer) resetGame();
         return;
     }
     setUserGuess(null);
@@ -250,19 +251,19 @@ export function useGameState(user: User | null, lobbyId: string | null = null) {
         setGameLoading(false);
     }
     
-  }, [currentLocationSet, resetGame, toast, isHost, currentRound, isMultiplayer, lobbyId]);
+  }, [currentLocationSet, resetGame, toast, isHost, isMultiplayer, currentRound, lobbyId]);
 
 
   const prepareGame = useCallback(async () => {
-     if(isMultiplayer && !isHost) return;
+    if (isMultiplayer && !isHost) return;
 
-    setCurrentRound(0);
-    setScore(0);
     setGameState('loading_location');
     setGameLoading(true);
 
-    getLocation();
-  }, [getLocation, isMultiplayer, isHost]);
+    if (!userLocation) {
+        getLocation();
+    }
+  }, [getLocation, isMultiplayer, isHost, userLocation]);
 
   useEffect(() => {
     const setupGame = async () => {
@@ -360,6 +361,8 @@ export function useGameState(user: User | null, lobbyId: string | null = null) {
         await updateDoc(doc(db, 'lobbies', lobbyId), { gameMode: mode });
     }
     setGameMode(mode);
+    setCurrentRound(0);
+    setScore(0);
 
     if (mode === 'NEAR_ME') {
       setGameState('customizing_near_me');
