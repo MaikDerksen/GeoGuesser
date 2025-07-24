@@ -26,6 +26,7 @@ function HomeComponent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const lobbyId = searchParams.get('lobbyId');
+  const { toast } = useToast();
 
   const {
     gameState,
@@ -354,4 +355,5 @@ export default function Home() {
     
 
     
+
 
