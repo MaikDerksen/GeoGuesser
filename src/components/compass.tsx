@@ -7,7 +7,7 @@ import { cn } from '@/lib/utils';
 interface CompassProps {
   heading: number;
   onGuess?: (angle: number) => void;
-  gameState: 'idle' | 'permission' | 'loading_location' | 'playing' | 'results';
+  gameState: 'idle' | 'permission' | 'loading_location' | 'playing' | 'results' | 'explorer' | 'mode_selection' | 'customizing_near_me';
   guessAngle?: number | null;
   targetAngle?: number | null;
   className?: string;
@@ -164,7 +164,11 @@ const Compass: FC<CompassProps> = ({
       </div>
       
       <div className="absolute w-full h-full pointer-events-none">
-        { (gameState === 'playing' || gameState === 'results') && <Arrow angle={northAngle} color="text-red-500" label="NORTH" length={120} /> }
+        { (gameState === 'playing' || gameState === 'results' || gameState === 'explorer') && <Arrow angle={northAngle} color="text-red-500" label="NORTH" length={120} /> }
+        
+        {gameState === 'explorer' && targetAngle !== null && targetAngle !== undefined && (
+            <Arrow angle={displayTargetAngle} color="text-green-500" label="SEARCH" length={120} />
+        )}
         
         {gameState === 'results' && (
           <>

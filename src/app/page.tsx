@@ -1,11 +1,11 @@
 
 "use client";
 
-import { Suspense, useEffect, useState } from 'react';
+import { Suspense, useEffect, useState, FormEvent } from 'react';
 import Compass from '@/components/compass';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Loader2, Compass as CompassIcon, QrCode, LogOut, Users, Play, Pin, Settings } from 'lucide-react';
+import { Loader2, Compass as CompassIcon, QrCode, LogOut, Users, Play, Pin, Settings, Search, Rocket } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import QRCode from "qrcode.react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
@@ -17,6 +17,8 @@ import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
 import type { GameMode } from '@/lib/game-data';
+import { Input } from '@/components/ui/input';
+import { getCoordinatesForAddress } from '@/ai/flows/get-coordinates-for-address';
 
 
 function HomeComponent() {
@@ -33,6 +35,7 @@ function HomeComponent() {
     totalRounds,
     timeLeft,
     target,
+    setTarget,
     heading,
     targetBearing,
     userGuess,
@@ -54,6 +57,9 @@ function HomeComponent() {
     lobby,
   } = useGameState(user, lobbyId);
 
+   const [explorerSearch, setExplorerSearch] = useState('');
+   const [isSearching, setIsSearching] = useState(false);
+
   useEffect(() => {
     if (!authLoading && !user) {
       router.push('/login');
@@ -61,11 +67,38 @@ function HomeComponent() {
   }, [authLoading, user, router]);
 
 
-  const handleModeSelection = (multiplayer: boolean) => {
-    if(multiplayer) {
+  const handleModeSelection = (mode: 'single' | 'multiplayer' | 'explorer') => {
+    if(mode === 'multiplayer') {
       router.push('/lobby');
+    } else if (mode === 'explorer') {
+        if (permissionState === 'prompt') {
+            setGameState('permission');
+        } else {
+             setGameState('explorer');
+        }
     } else {
       setGameState('mode_selection');
+    }
+  }
+
+  const handleExplorerSearch = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!explorerSearch) return;
+    
+    setIsSearching(true);
+    try {
+        const coords = await getCoordinatesForAddress(explorerSearch);
+        if(coords) {
+            setTarget({ name: explorerSearch, coordinates: coords });
+        } else {
+            toast({ title: 'Not Found', description: `Could not find coordinates for "${explorerSearch}"`, variant: 'destructive'});
+            setTarget(null);
+        }
+    } catch(err: any) {
+        toast({ title: 'Error', description: `Failed to search: ${err.message}`, variant: 'destructive'});
+        setTarget(null);
+    } finally {
+        setIsSearching(false);
     }
   }
 
@@ -92,6 +125,29 @@ function HomeComponent() {
                     <Button onClick={handleGrantPermission} size="lg">Grant Permission</Button>
                 </CardContent>
             </Card>
+        );
+      case 'explorer':
+        return (
+          <div className="flex flex-col items-center gap-6 w-full max-w-md">
+             <h2 className="text-3xl font-bold flex items-center gap-2"><Rocket className="h-8 w-8 text-primary"/> Explorer Mode</h2>
+             <form onSubmit={handleExplorerSearch} className="w-full flex gap-2">
+                <Input 
+                    placeholder="Enter an address or landmark..."
+                    value={explorerSearch}
+                    onChange={(e) => setExplorerSearch(e.target.value)}
+                />
+                <Button type="submit" disabled={isSearching} size="icon">
+                   {isSearching ? <Loader2 className="animate-spin" /> : <Search />}
+                </Button>
+             </form>
+             <Compass 
+                heading={heading} 
+                gameState={gameState}
+                targetAngle={targetBearing}
+             />
+             {target && <p className="text-lg font-semibold">Pointing to: <span className="text-primary">{target.name}</span></p>}
+             <Button variant="link" onClick={() => resetGame()}>Back to main menu</Button>
+          </div>
         );
       case 'mode_selection':
         return (
@@ -241,8 +297,9 @@ function HomeComponent() {
             </CardHeader>
             <CardContent className="flex flex-col gap-4">
               <p className="text-muted-foreground">Welcome, {user.displayName || user.email}!</p>
-               <Button onClick={() => handleModeSelection(false)} size="lg"><Play /> Single Player</Button>
-               <Button onClick={() => handleModeSelection(true)} size="lg"><Users /> Multiplayer</Button>
+               <Button onClick={() => handleModeSelection('single')} size="lg"><Play /> Single Player</Button>
+               <Button onClick={() => handleModeSelection('multiplayer')} size="lg"><Users /> Multiplayer</Button>
+               <Button onClick={() => handleModeSelection('explorer')} size="lg" variant="outline"><Rocket /> Explorer Mode</Button>
             </CardContent>
           </Card>
         );

@@ -15,7 +15,7 @@ import { db } from '@/lib/firebase';
 import type { Lobby } from './use-lobby';
 
 
-type GameState = 'idle' | 'mode_selection' | 'permission' | 'customizing_near_me' | 'loading_location' | 'playing' | 'results';
+type GameState = 'idle' | 'mode_selection' | 'permission' | 'customizing_near_me' | 'loading_location' | 'playing' | 'results' | 'explorer';
 type GameModeId = string | 'NEAR_ME';
 
 interface NearMeOptions {
@@ -76,10 +76,19 @@ export function useGameState(user: User | null, lobbyId: string | null = null) {
         toast({ title: "Error", description: "Could not fetch game modes from the server.", variant: "destructive" });
     });
    }, [toast]);
+    
+   // Get user location once on initial load for explorer mode and caching
+   useEffect(() => {
+       if(permissionState === 'granted') {
+           getLocation();
+       }
+   }, [permissionState, getLocation]);
 
    useEffect(() => {
     if (!lobbyId) {
-        setGameState('idle');
+        if(gameState !== 'explorer') {
+          setGameState('idle');
+        }
         return;
     }
 
@@ -115,7 +124,7 @@ export function useGameState(user: User | null, lobbyId: string | null = null) {
     });
 
     return () => unsub();
-  }, [lobbyId, toast]);
+  }, [lobbyId, toast, gameState]);
 
   const totalRounds = useMemo(() => {
     if (gameMode === 'NEAR_ME') {
@@ -392,8 +401,12 @@ export function useGameState(user: User | null, lobbyId: string | null = null) {
 
   const handleGrantPermission = async () => {
     const status = await requestPermission();
-    if (status === 'granted' && gameMode) {
-        prepareGame();
+    if (status === 'granted') {
+        if (gameState === 'permission' && (gameMode || lobbyId)) { // If we were waiting for permission for a game
+             prepareGame();
+        } else { // If we just needed it for explorer mode
+            setGameState('explorer');
+        }
     } else {
         setGameState('idle');
         setGameMode(null);
@@ -416,6 +429,7 @@ export function useGameState(user: User | null, lobbyId: string | null = null) {
     totalRounds,
     timeLeft,
     target,
+    setTarget,
     heading,
     targetBearing,
     userGuess,
