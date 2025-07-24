@@ -285,19 +285,19 @@ export default function AdminPage() {
            <Accordion type="single" collapsible className="w-full">
             {gameModes.map(mode => (
                 <AccordionItem value={mode.id} key={mode.id}>
-                     <AccordionTrigger className="flex-1 hover:no-underline">
-                        <div className="flex items-center justify-between w-full">
+                    <div className="flex items-center w-full">
+                         <AccordionTrigger className="flex-1 hover:no-underline">
                             <span className="text-lg font-semibold text-left">{mode.name} ({mode.locations?.length || 0} locations)</span>
-                            <div className="flex items-center gap-2 pl-4" onClick={(e) => e.stopPropagation()}>
-                                <Button size="sm" variant="outline" onClick={() => { setEditingGameMode(mode); setNewGameModeName(mode.name); setIsGameModeFormOpen(true);}}>
-                                    <Edit className="h-4 w-4"/>
-                                </Button>
-                                <Button size="sm" variant="destructive" onClick={() => handleDeleteGameMode(mode.id, mode.name)}>
-                                    <Trash2 className="h-4 w-4"/>
-                                </Button>
-                            </div>
+                        </AccordionTrigger>
+                        <div className="flex items-center gap-2 pl-4">
+                            <Button size="sm" variant="outline" onClick={() => { setEditingGameMode(mode); setNewGameModeName(mode.name); setIsGameModeFormOpen(true);}}>
+                                <Edit className="h-4 w-4"/>
+                            </Button>
+                            <Button size="sm" variant="destructive" onClick={() => handleDeleteGameMode(mode.id, mode.name)}>
+                                <Trash2 className="h-4 w-4"/>
+                            </Button>
                         </div>
-                    </AccordionTrigger>
+                    </div>
                     <AccordionContent>
                         <div className="p-1 md:p-4 bg-muted/40 rounded-lg">
                              <div className="flex justify-end mb-4">
@@ -375,3 +375,5 @@ export default function AdminPage() {
     </main>
   );
 }
+
+    
