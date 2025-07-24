@@ -134,7 +134,7 @@ export function useGameState(user: User | null, lobbyId: string | null = null) {
     if (gameMode === 'NEAR_ME') {
       return nearMeOptions.rounds;
     }
-    const selectedMode = gameModes.find(m => m.id === gameMode || m.name === gameMode);
+    const selectedMode = gameModes.find(m => m.id === gameMode);
     return selectedMode?.locations?.length || 7;
   }, [gameMode, nearMeOptions.rounds, gameModes]);
 
@@ -346,31 +346,33 @@ export function useGameState(user: User | null, lobbyId: string | null = null) {
   }, [gameState, gameMode, locationLoading, userLocation, locationError, nearMeOptions, isMultiplayer, isHost, lobbyId, user]);
 
 
-  const handleSetGameMode = useCallback(async (modeName: string) => {
-    let finalModeId: string | undefined = modeName;
+  const handleSetGameMode = useCallback(async (mode: GameModeId) => {
     
-    // If it's a continent, we need to find the corresponding game mode ID
     const continentMap: { [key: string]: string } = {
-        'North America': 'USA Landmarks',
-        'South America': 'Latin America',
+        'america': 'USA Landmarks',
+        'south_america': 'Latin America',
+        'europe': 'Europe',
+        'asia': 'Asia',
+        'africa': 'Africa',
+        'australia': 'Oceania'
     };
-    const mappedName = continentMap[modeName] || modeName;
 
-    // Find the mode from the fetched list
-    const selectedMode = gameModes.find(m => m.name === mappedName || m.id === mappedName);
+    const targetGameName = continentMap[mode] || mode;
 
-    if (mappedName !== 'NEAR_ME' && !selectedMode) {
-        toast({ title: "Mode Not Found", description: `Could not find a game mode called "${mappedName}".`, variant: "destructive"});
-        return;
+    let selectedMode: GameMode | undefined;
+    if (targetGameName !== 'NEAR_ME') {
+        selectedMode = gameModes.find(m => m.name === targetGameName || m.id === targetGameName);
+    } else {
+        selectedMode = { id: 'NEAR_ME', name: 'NEAR_ME', locations: []};
     }
 
-    finalModeId = mappedName === 'NEAR_ME' ? 'NEAR_ME' : selectedMode?.id;
+    if (!selectedMode) {
+        toast({ title: "Mode Not Found", description: `Could not find a game mode for "${targetGameName}".`, variant: "destructive"});
+        return;
+    }
     
-    if (!finalModeId) {
-         toast({ title: "Error", description: `Could not resolve ID for game mode "${mappedName}".`, variant: "destructive"});
-        return;
-    }
-
+    const finalModeId = selectedMode.id;
+    
     if(isMultiplayer && lobbyId && isHost) {
         await updateDoc(doc(db, 'lobbies', lobbyId), { gameMode: finalModeId });
     }
@@ -447,6 +449,7 @@ export function useGameState(user: User | null, lobbyId: string | null = null) {
     heading,
     targetBearing,
     userGuess,
+    handleGuess,
     appUrl,
     gameMode,
     gameModes,
@@ -455,7 +458,6 @@ export function useGameState(user: User | null, lobbyId: string | null = null) {
     setNearMeOptions,
     handleSetGameMode,
     handleStart,
-    handleGuess,
     handleGrantPermission,
     permissionState,
     resetGame,
