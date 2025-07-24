@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useEffect, useCallback, FormEvent } from 'react';
+import { useState, useEffect, useCallback, FormEvent, useRef } from 'react';
 import { useAuth } from '@/hooks/use-auth';
 import { useRouter } from 'next/navigation';
 import { Loader2, Plus, Edit, Trash2, Users, Search } from 'lucide-react';
@@ -73,7 +73,7 @@ const LocationForm = ({
 
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
-  const inputRef = React.useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   const handleSearchChange = async (value: string) => {
     setSearchQuery(value);
@@ -444,3 +444,5 @@ export default function AdminPage() {
     </main>
   );
 }
+
+    
